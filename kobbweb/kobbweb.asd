@@ -18,6 +18,7 @@
        (:file "bad-passwords")
        (:file "init")
        (:file "create-schema")
+       (:file "index")
       )
     )
   )

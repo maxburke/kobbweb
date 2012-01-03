@@ -1,0 +1,72 @@
+<html xmlns="http://www.w4.org/1999/xhtml">
+    <head>
+        <link href="/static/bootstrap.min.css" media="all" rel="stylesheet" type="text/css"/>
+        <link href="/static/kobbweb.css" media="all" rel="stylesheet" type="text/css"/>
+    </head>
+    <body>
+        <script type="text/javascript" src="/static/json2.js"></script>
+        <script type="text/javascript" src="/static/jquery-1.5.2.js"></script>
+        <script type="text/javascript" src="/static/bootstrap-modal.js"></script>
+        <script type="text/javascript" src="/static/login.js"></script>
+        <script type="text/javascript">
+            $(function() { init(); });
+        </script>
+
+        <div class="topbar">
+            <div class="fill">
+                <div class="container">
+                    <ul class="nav">
+                        <li><a href="/"><img src="/static/icons/kobbweb_130x20.png"/></a></li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="container">
+            <div class="content">
+                <div class="alert-message hidden" id="status"></div>
+                <div class="row">
+                    <div class="span7">
+                        <img src="/static/icons/kobb_cropped.png"/>
+                    </div>
+                    <div class="span7">
+                        <form id="login-form">
+                            <fieldset>
+                                <div class="clearfix">
+                                    <label for="email">Email Address</label>
+                                    <div class="input">
+                                        <input class="xlarge" id="email" type="text"></input>
+                                    </div>
+                                </div>
+
+                                <div class="clearfix">
+                                    <label for="email">Password</label>
+                                    <div class="input">
+                                        <input class="xlarge" id="password" type="password"></input>
+                                    </div>
+                                </div>
+
+                                <div class="clearfix hidden" id="password-verify-input">
+                                    <label>Confirm Password</label>
+                                    <div class="input">
+                                        <input class="xlarge" id="password-verify" type="password"></input>
+                                    </div>
+                                </div>
+
+                                <div class="actions">
+                                    <button id="submit" type="button" class="btn primary">Sign In</button>
+                                    &nbsp;
+                                    <span id="new">Not a member? <a href="#" id="new">Click here!</a></span>
+                                </div>
+                            </fieldset>
+                        </form>
+                    </div>
+                </div>
+            </div>
+            <footer>
+                <p>&copy; kobbweb.net</p>
+            </footer>
+        </div>
+    </body>
+</html>
+

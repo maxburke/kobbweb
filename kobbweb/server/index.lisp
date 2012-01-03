@@ -1,8 +1,11 @@
 (in-package :kobbweb)
 
+(defun handle-logged-in ()
+)
+
 (defun index-handler ()
  (if *session*
-  (redirect "/home")
+  (handle-logged-in)
   (handle-static-file #p"static/index.html")
  )
 )
