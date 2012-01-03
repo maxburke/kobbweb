@@ -1,12 +1,5 @@
 newMember = false;
 
-function showJoinForm() {
-    $('#password-verify-input').show();
-    $('#new').hide();
-    $('#submit').text('Join!');
-    newMember = true;
-}
-
 function sessionCreated() {
     window.location = "/home";
 }
@@ -26,23 +19,15 @@ function sessionCreationError(xhr, textStatus, errorThrown) {
     }
 }
 
-function submit() {
+function submit(obj) {
     $('#status').hide();
 
-    var email = $('#email').val();
-    var password = $('#password').val();
-    var passwordVerify = $('#password-verify').val();
     var method = 'PUT';
 
-    if (passwordVerify.length !== 0)
+    if (obj.passwordVerify.length !== 0)
         method = 'POST'
 
-    var submitData = JSON.stringify({
-        email : email,
-        password : password,
-        passwordVerify : passwordVerify
-    });
-
+    var submitData = JSON.stringify(obj);
     var ajaxRequest = {
         url : '/sessions',
         type : method,
@@ -55,14 +40,35 @@ function submit() {
     $.ajax(ajaxRequest)
 }
 
-function submitOnEnter(e) {
+function submitOnEnter(e, submitDelegate) {
     if (e.charCode == 13) {
-        submit();
+        submitDelegate();
     }
 }
 
+function loginDelegate() { 
+    submit({
+        email : $('#email').val(),
+        password : $('#password').val(),
+        passwordVerify : ''
+    });
+}
+
+function joinDelegate() {
+    submit({
+        email : $('#join-email').val(),
+        password : $('#join-password').val(),
+        passwordVerify : $('#join-password-verify').val()
+    });
+}
+
 function init() {
-    $('#new').click(showJoinForm);
-    $('#submit').click(submit);
-    $('#login-form').keypress(submitOnEnter);
+    $('#submit').click(loginDelegate);
+    $('#join').click(joinDelegate);
+    $('#login-form').keypress(function(e) { 
+            submitOnEnter(e, loginDelegate); 
+        });
+    $('#join-form').keypress(function(e) { 
+            submitOnEnter(e, joinDelegate); 
+        });
 }

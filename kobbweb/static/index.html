@@ -13,11 +13,16 @@
         </script>
 
         <div class="topbar">
-            <div class="fill">
+            <div class="topbar-inner">
                 <div class="container">
                     <ul class="nav">
                         <li><a href="/"><img src="/static/icons/kobbweb_130x20.png"/></a></li>
                     </ul>
+                    <form id="login-form" class="pull-right" action>
+                            <input id="email" type="text" placeholder="email"></input>
+                            <input id="password" type="password" placeholder="password"></input>
+                            <button id="submit" type="button" class="btn primary">Sign In</button>
+                    </form>
                 </div>
             </div>
         </div>
@@ -27,36 +32,35 @@
                 <div class="alert-message hidden" id="status"></div>
                 <div class="row">
                     <div class="span7">
-                        <img src="/static/icons/kobb_cropped.png"/>
+                        <center><img src="/static/icons/kobb_small.png"/></center>
                     </div>
                     <div class="span7">
-                        <form id="login-form">
+                    <h3>Sign up!</h3>
+                        <form id="join-form">
                             <fieldset>
                                 <div class="clearfix">
                                     <label for="email">Email Address</label>
                                     <div class="input">
-                                        <input class="xlarge" id="email" type="text"></input>
+                                        <input class="xlarge" id="join-email" type="text"></input>
                                     </div>
                                 </div>
 
                                 <div class="clearfix">
                                     <label for="email">Password</label>
                                     <div class="input">
-                                        <input class="xlarge" id="password" type="password"></input>
+                                        <input class="xlarge" id="join-password" type="password"></input>
                                     </div>
                                 </div>
 
-                                <div class="clearfix hidden" id="password-verify-input">
+                                <div class="clearfix" id="password-verify-input">
                                     <label>Confirm Password</label>
                                     <div class="input">
-                                        <input class="xlarge" id="password-verify" type="password"></input>
+                                        <input class="xlarge" id="join-password-verify" type="password"></input>
                                     </div>
                                 </div>
 
                                 <div class="actions">
-                                    <button id="submit" type="button" class="btn primary">Sign In</button>
-                                    &nbsp;
-                                    <span id="new">Not a member? <a href="#" id="new">Click here!</a></span>
+                                    <p><button id="join" type="button" class="btn primary">Join!</button></p>
                                 </div>
                             </fieldset>
                         </form>
