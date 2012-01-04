@@ -10,6 +10,13 @@
      (email :type text)
      (password :type text))
    )
+  )
+  (execute
+   (:create-table posts
+    ((post_id :type serial :primary-key t)
+     (user_id :type integer)
+     (content_id :type 'uuid))
+   )
 ;   (:create-table locations
 ;    ((location_id :type serial :primary-key t)
 ;     (name :type text)
