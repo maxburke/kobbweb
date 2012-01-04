@@ -1,0 +1,53 @@
+users:
+    user id (32-bit)
+    email
+    password
+    root_uuid
+
+posts:
+    id, user_id -> uuid
+
+alias:
+    alias -> uuid
+
+ACL:
+    uuid -> list_of_user_ids
+
+item_list:
+    uuid -> list_of_item_uuids
+
+data:
+    sha1 -> content
+
+item:
+    uuid -> user_id
+            ACL_uuid
+            item_list_uuid
+            data_ref
+
+///
+workflow:
+create user:
+    * create a new item that is empty
+    * create a new ACL entry featuring just the user
+    * create item_list_uuid
+
+acl's: 
+    * cannot be immutable
+
+post item:
+    * POST json object to /content of
+        "{ 
+            from : "foo@bar.com",
+            to : "alias@kobbweb.net" 
+                   (or "a0eebc999c0b4ef8bb6d6bb9bd380a11",  // from website
+                    or "a0eebc999c0b4ef8bb6d6bb9bd380a11@kobbweb.net", // from email
+                    or "")
+            data : "[data]"
+        }"
+        * this hashes the content, stores in data
+        * create an item entry
+        * by default it assumes parent's ACL_uuid
+        * object is added to the database and a uuid is generated
+        * if to is an alias then the parent object's uuid is looked up
+        * if to is blank then it's added to the user's root_uuid.
