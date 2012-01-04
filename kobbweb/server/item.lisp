@@ -3,22 +3,24 @@
 ;;;; UUID generation and comparison.
 ;;; UUIDs are all represented as byte vectors. Always.
 (defvar *uuid-lock* (sb-thread:make-mutex :name "uuid lock"))
-(defvar *null-uuid* (uuid:uuid-to-byte-array (make-null-uuid)))
-(defvar *hex-chars* "0123456789abcdef")
+(defvar *null-uuid* (uuid:uuid-to-byte-array (uuid:make-null-uuid)))
 (defvar *last-uuid* *null-uuid*)
 
 (defun uuid= (uuid1 uuid2)
  (reduce (lambda (x y) (and x y)) (map 'vector #'= uuid1 uuid2))
 )
 
-(defun uuid-to-string (uuid)
- (let ((output (make-array 32 :fill-pointer 0)))
+(defvar *hex-chars* "0123456789abcdef")
+(defun byte-vector-to-hex-string (uuid)
+ (let ((output (make-array (* 2 (length uuid))))
+       (idx 0))
   (loop for b across uuid
    do
    (let ((high-nybble (logand (ash b -4) 15))
          (low-nybble (logand b 15)))
-    (vector-push (char *hex-chars* high-nybble) output)
-    (vector-push (char *hex-chars* low-nybble) output)
+    (setf (aref output idx) (char *hex-chars* high-nybble))
+    (setf (aref output (1+ idx)) (char *hex-chars* low-nybble))
+    (setf idx (+ 2 idx))
    )
   )
   (coerce output 'string)
@@ -40,29 +42,134 @@
  )
 )
 
-(defun item-fetch (uuid)
-)
-
-(defun acl-create-default (user-id)
-)
-
-(defun item-get-acl-from (parent-uuid)
-)
-
 (defun user-id-to-bytes (user-id)
- (let ((seq (make-array 4 :fill-pointer 0)))
-  (vector-push (logand user-id 255) seq)
-  (vector-push (logand (ash user-id -8) 255) seq)
-  (vector-push (logand (ash user-id -16) 255) seq)
-  (vector-push (logand (ash user-id -24) 255) seq)
+ (let ((seq (make-array 4 :element-type '(unsigned-byte 8))))
+  (setf (aref seq 0) (logand user-id 255))
+  (setf (aref seq 1) (logand (ash user-id -8) 255))
+  (setf (aref seq 2) (logand (ash user-id -16) 255))
+  (setf (aref seq 3) (logand (ash user-id -24) 255))
   seq)
 )
 
-(defun bytes-to-user-id (bytes)
+(defun word-to-fixnum (bytes)
  (logior (aref bytes 0) 
          (ash (aref bytes 1) 8)
          (ash (aref bytes 2) 16)
          (ash (aref bytes 3) 24))
+)
+
+(defconstant +word-size+ 4)
+(defconstant +uuid-size+ 16)
+(defconstant +sha1-size+ 20)
+
+(defstruct item
+ (uuid #() :type vector)
+ (acl-uuid #() :type vector)
+ (list-uuid #() :type vector)
+ (parent-uuid #() :type vector)
+ (content-ref #() :type vector)
+ (user-id 0 :type fixnum)
+ (schema-version 1 :type fixnum)
+)
+
+(defun item-write-to-stream (item stream)
+ (let ((raw-user-id (user-id-to-bytes (item-user-id item))))
+  (write-sequence raw-user-id stream)
+  (write-sequence (item-acl-uuid item) stream)
+  (write-sequence (item-list-uuid item) stream)
+  (write-sequence (item-parent-uuid item) stream)
+  (write-sequence (item-content-ref item) stream)
+  (write-sequence (item-schema-version item) stream)
+ )
+)
+
+(defun item-read-from-stream (uuid stream)
+ (if (not (null stream))
+  (let ((item (make-item))
+        (acl-uuid (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
+        (list-uuid (make-array +uuid-size+ :element-type '(unsigned-byte 8)))
+        (parent-uuid (make-array +uuid-size+ :element-type '(unsigned-byte 8)))
+        (content-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
+        (user-id (make-array +word-size+ :element-type '(unsigned-byte 8)))
+        (schema-version (make-array +word-size+ :element-type '(unsigned-byte 8)))
+       )
+   (read-sequence user-id stream :start 0 :end +word-size+)
+   (read-sequence acl-uuid stream :start 0 :end +sha1-size+)
+   (read-sequence list-uuid stream :start 0 :end +uuid-size+)
+   (read-sequence parent-uuid stream :start 0 :end +uuid-size+)
+   (read-sequence content-ref stream :start 0 :end +sha1-size+)
+   (read-sequence schema-version stream :start 0 :end +word-size)
+   (setf (item-uuid item) uuid)
+   (setf (item-acl-uuid item) acl-uuid)
+   (setf (item-list-uuid item) list-uuid)
+   (setf (item-parent-uuid item) parent-uuid)
+   (setf (item-content-ref item) content-ref)
+   (setf (item-user-id item) (word-to-fixnum user-id))
+   (setf (item-schema-version item) (word-to-fixnum schema-version))
+   item
+  )
+  nil
+ )
+)
+
+(defmacro with-hex-named-file ((direction root name-buffer stream) &body body)
+ (let ((file-name-var (gensym))
+       (file-path-var (gensym)))
+  `(let* ((,file-name-var (byte-vector-to-hex-string ,name-buffer))
+        (,file-path-var (make-pathname :directory '(:relative "data" ,root) :name ,file-name-var))
+        (,stream (open ,file-path-var
+               :element-type '(unsigned-byte 8) 
+               :direction ,direction 
+               :if-does-not-exist :create 
+               :if-exists nil)))
+    ,@body
+    (if (not (null ,stream))
+     (close ,stream))
+   )
+ )
+)
+
+(defmacro with-sha1-digest ((digest buffer) &body body)
+ (let ((digester-var (gensym)))
+  `(let ((,digester-var (ironclad:make-digest :sha1)))
+    (ironclad:update-digest ,digester-var ,buffer)
+    (let ((,digest (ironclad:produce-digest ,digester-var)))
+     ,@body
+    )
+   )
+ )
+)
+
+(defun acl-create-default (user-id)
+ (let ((bytes (user-id-to-bytes user-id))
+       (acl-id))
+  (with-sha1-digest (digest bytes)
+   (with-hex-named-file (:output "acl_list" digest stream)
+    (if (not (null stream))
+     (write-sequence bytes stream))
+    (setf acl-id digest)
+   )
+  )
+  acl-id
+ )
+)
+
+(defun item-get-acl-from (parent-uuid)
+ (assert nil)
+)
+
+(defun item-store (item)
+ (with-hex-named-file (:output "items" (item-uuid item) file)
+  (item-write-to-stream item file)
+ )
+)
+
+(defun item-load (uuid)
+ (let ((item))
+  (with-hex-named-file (:input "items" uuid file)
+   (setf item (item-read-from-stream uuid file)))
+  item
+ )
 )
 
 (defun item-create (user-id parent-uuid content-ref)
@@ -71,28 +178,24 @@
 
   (if (null parent-uuid)
    (progn (setf parent-uuid *null-uuid*)
-          (setf acl-uuid (acl-create-default))
+          (setf acl-uuid (acl-create-default user-id))
    )
    (progn (setf acl-uuid (item-get-acl-from parent-uuid))
    )
   )
-  (if (null content-ref)
-   (setf content-ref (make-array 20)))
 
-  (let* ((uuid-file-name (uuid-to-string uuid))
-         (file-path (make-pathname :directory '(:relative "data" "items") :name uuid-file-name))
-         (file (open file-path :element-type '(unsigned-byte 8) :direction :output :if-does-not-exist :create :if-exists nil))
-         (raw-user-id (user-id-to-bytes user-id))
-         (raw-acl-uuid (uuid-to-byte-array acl-uuid))
-         (raw-parent-uuid (uuid-to-byte-array parent-uuid))
-        )
-   (write-sequence raw-user-id file)
-   (write-sequence raw-acl-uuid file)
-   (write-sequence raw-parent-uuid file)
-   (write-sequence content-ref file)
-   (close file)
-  )
-  uuid
+  (if (null content-ref)
+   (setf content-ref (make-array 20 :element-type '(unsigned-byte 8))))
+
+  (let ((item (make-item 
+               :uuid uuid
+               :acl-uuid acl-uuid
+               :list-uuid *null-uuid*
+               :parent-uuid parent-uuid
+               :content-ref content-ref
+               :user-id user-id)))
+   (item-store item)
+   item)
  )
 )
 
