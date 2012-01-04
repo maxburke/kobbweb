@@ -113,12 +113,11 @@
  )
 )
 
-(defmacro with-hex-named-file ((direction does-not-exist exists root name-buffer stream) &body body)
- (let ((file-name-var (gensym))
-       (file-path-var (gensym)))
+(defmacro with-hex-named-file ((direction does-not-exist exists root name-buffer stream file-path-var) &body body)
+ (let ((file-name-var (gensym)))
   `(let* ((,file-name-var (byte-vector-to-hex-string ,name-buffer))
-        (,file-path-var (make-pathname :directory '(:relative "data" ,root) :name ,file-name-var))
-        (,stream (open ,file-path-var
+          (,file-path-var (make-pathname :directory '(:relative "data" ,root) :name ,file-name-var))
+          (,stream (open ,file-path-var
                :element-type '(unsigned-byte 8) 
                :direction ,direction 
                :if-does-not-exist ,does-not-exist 
@@ -145,7 +144,7 @@
  (let ((bytes (fixnum-to-word-bytes user-id))
        (acl-id))
   (with-sha1-digest (digest bytes)
-   (with-hex-named-file (:output nil nil "acl_list" digest stream)
+   (with-hex-named-file (:output nil nil "acl_list" digest stream file-name)
     (if (not (null stream))
      (write-sequence bytes stream))
     (setf acl-id digest)
@@ -155,22 +154,69 @@
  )
 )
 
-(defun item-get-acl-from (parent-uuid)
- (assert nil)
+(defun data-load (content-ref)
+ (let ((content))
+  (with-hex-named-file (:input nil nil "data" content-ref file file-name)
+   (let* ((content-length (file-length file))
+          (content-storage (make-array content-length :element-type '(unsigned-byte 8))))
+    (assert (not (null content-length)))
+    (read-sequence content-storage file)
+    (setf content content-storage)
+   )
+  )
+  content
+ )
+)
+
+(defun data-store-octets (content)
+ (let ((content-ref))
+  (with-sha1-digest (digest content)
+
+   ; Data store files are set to create if they do not exist and return nil if they do
+   (with-hex-named-file (:output :create nil "data" digest stream file-name)
+    (setf content-ref digest)
+
+    ; If we have a valid file stream then write the contents to it.
+    (if (not (null stream))
+     (write-sequence content stream)
+
+     ; However, if we don't have a valid file stream ensure that we it does exist.
+     ; If the file doesn't exist then set the returned content ref to nil. This is
+     ; a bad condition.
+     (if (null (probe-file file-name))
+      (setf content-ref nil)))
+   )
+  )
+  content-ref
+ )
+)
+
+(defun data-store-string (string)
+ (let ((octets (flexi-streams:string-to-octets string)))
+  (data-store-octets octets)
+ )
 )
 
 (defun item-store (item)
- (with-hex-named-file (:output :create :supersede "items" (item-uuid item) file)
+ (with-hex-named-file (:output :create :supersede "items" (item-uuid item) file file-name)
   (item-write-to-stream item file)
  )
 )
 
 (defun item-load (uuid)
  (let ((item))
-  (with-hex-named-file (:input nil nil "items" uuid file)
+  (with-hex-named-file (:input nil nil "items" uuid file file-name)
    (if (not (null file))
     (setf item (item-read-from-stream uuid file))))
   item
+ )
+)
+
+(defun item-get-acl-from-parent (parent-uuid)
+ (let ((item (item-load parent-uuid)))
+  (if (not (null item))
+   (item-parent-uuid item)
+  )
  )
 )
 
@@ -182,7 +228,7 @@
    (progn (setf parent-uuid *null-uuid*)
           (setf acl-uuid (acl-create-default user-id))
    )
-   (progn (setf acl-uuid (item-get-acl-from parent-uuid))
+   (progn (setf acl-uuid (item-get-acl-from-parent parent-uuid))
    )
   )
 
