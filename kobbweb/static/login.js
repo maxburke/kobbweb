@@ -1,7 +1,7 @@
 newMember = false;
 
 function sessionCreated() {
-    window.location = "/home";
+    window.location = "/";
 }
 
 function setLoginStatus(statusCode) {
