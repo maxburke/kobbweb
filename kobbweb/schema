@@ -10,8 +10,11 @@ posts:
 alias:
     alias -> uuid
 
+ACL_list
+    sha1 -> list_of_user_ids
+
 ACL:
-    uuid -> list_of_user_ids
+    uuid -> acl_ref
 
 item_list:
     uuid -> list_of_item_uuids
@@ -21,9 +24,10 @@ data:
 
 item:
     uuid -> user_id
-            ACL_uuid
+            ACL_ref
             item_list_uuid
             data_ref
+            version
 
 ///
 workflow:
