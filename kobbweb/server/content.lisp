@@ -1,0 +1,96 @@
+(in-package :kobbweb)
+
+(declaim (inline is-hex-char) (optimize (debug 0) (speed 3) (safety 0)))
+(defun is-hex-char (c)
+ (declare (type character c))
+ (let ((code (char-code c)))
+  (or (and (>= code (char-code #\0)) (<= code (char-code #\9)))
+      (and (>= code (char-code #\a)) (<= code (char-code #\f))))
+ )
+)
+
+(declaim (inline contains-only-hex-chars))
+(defun contains-only-hex-chars (string)
+ (declare (type simple-string string))
+ (labels ((recursive-contains-only-hex-chars (str i length)
+           (declare (type fixnum i length)
+                    (type simple-string str))
+           (if (= i length)
+            t
+            (if (is-hex-char (char str i))
+             (recursive-contains-only-hex-chars str (1+ i) length)
+             nil))))
+  (recursive-contains-only-hex-chars string 0 (length string)))
+)
+
+(defun resolve-alias (alias)
+ (assert nil)
+)
+
+(defun to-uuid (uuid-or-alias)
+ (declare (type simple-string uuid-or-alias))
+ (if (and (= (length uuid-or-alias) 32)
+          (contains-only-hex-chars uuid-or-alias))
+  (hex-string-to-byte-vector uuid-or-alias)
+  (resolve-alias uuid-or-alias)
+ )
+)
+
+(defun validate-access (uuid)
+)
+
+(defun content-get-user-id (json-data)
+ (if *session*
+  (session-value 'id session)
+  (let ((email (cdr (assoc :email json-data))))
+   (if (null email)
+    nil
+    (with-connection *db-connection-parameters*
+     (fetch-user-id email))
+   )
+  )
+ )
+)
+
+(defun content-handle-get (uuid json-data)
+ (assert (null json-data))
+ (let ((item (item-load uuid))
+       (user-id (content-get-user-id json-data)))
+  (if (acl-is-member-of (item-acl-uuid item) user-id)
+   "correctly handle retrieving data here"
+   "correctly handle an ACL authentication failure here"
+  )
+ )
+)
+
+(defvar *successful-post-response* (json:encode-json-to-string '((:success . "true"))))
+(defun content-handle-post (uuid json-data)
+ (assert (not (null json-data)))
+ (let* ((content-ref)
+        (user-id (content-get-user-id json-data))
+        (content-ref (data-store-string (cdr (assoc :data json-data))))
+        (item (item-create user-id uuid content-ref)))
+  (with-connection *db-connection-parameters*
+   (execute (:insert-into 'posts :set 'user_id user-id 'item_id (item-uuid item)))
+  )
+ )
+ *successful-post-response*
+)
+
+(defun content-handler (uri)
+ (let* ((req (request-method* *request*))
+        (uuid-or-alias-string (cadr uri))
+        (uuid (if (not (null uuid-or-alias-string))
+                  (to-uuid uuid-or-alias-string)
+                  *null-uuid*))
+        (raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8))
+        (json-post-data (if (not (null raw-json-string)) 
+                            (json:decode-json-from-string raw-json-string)
+                            nil)))
+  (cond ((eq req :get) (content-handle-get uuid json-post-data))
+        ((eq req :post) (content-handle-post uuid json-post-data))
+        (t (setf (return-code* *request*) +http-bad-request+))
+  )
+ )
+)
+

@@ -5,7 +5,7 @@
 
 (defsystem "kobbweb"
  :serial t
- :depends-on (:hunchentoot :cl-who :postmodern :cl-json)
+ :depends-on (:hunchentoot :cl-who :postmodern :cl-json :uuid :ironclad)
  :components (
    (:module :server
     :serial t
@@ -15,10 +15,13 @@
        (:file "parameters")
        (:file "html-helpers")
        (:file "session")
+       (:file "join")
        (:file "bad-passwords")
        (:file "init")
        (:file "create-schema")
        (:file "index")
+       (:file "item")
+       (:file "content")
       )
     )
   )

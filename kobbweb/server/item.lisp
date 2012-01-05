@@ -11,10 +11,10 @@
 )
 
 (defvar *hex-chars* "0123456789abcdef")
-(defun byte-vector-to-hex-string (uuid)
- (let ((output (make-array (* 2 (length uuid))))
+(defun byte-vector-to-hex-string (byte-vector)
+ (let ((output (make-array (* 2 (length byte-vector))))
        (idx 0))
-  (loop for b across uuid
+  (loop for b across byte-vector
    do
    (let ((high-nybble (logand (ash b -4) 15))
          (low-nybble (logand b 15)))
@@ -24,6 +24,22 @@
    )
   )
   (coerce output 'string)
+ )
+)
+
+(defun hex-string-to-byte-vector (string)
+ (let* ((string-length (length string))
+        (output (make-array (ash string-length -1) :element-type '(unsigned-byte 8))))
+  (loop for i from 0 to (1- string-length) by 2
+   do
+   (let* ((high-nybble (position (char string i) *hex-chars* :test #'equalp))
+          (low-nybble (position (char string (1+ i)) *hex-chars* :test #'equalp))
+          (vector-index (ash i -1))
+          (byte (logior (ash (logand high-nybble 15) 4) (logand low-nybble 15))))
+    (setf (aref output vector-index) byte)
+   )
+  )
+  output
  )
 )
 
@@ -62,25 +78,26 @@
 (defconstant +uuid-size+ 16)
 (defconstant +sha1-size+ 20)
 
+(declaim (inline make-item))
 (defstruct item
+ (schema-version 1 :type fixnum)
  (uuid #() :type vector)
  (acl-uuid #() :type vector)
  (list-uuid #() :type vector)
  (parent-uuid #() :type vector)
  (content-ref #() :type vector)
  (user-id 0 :type fixnum)
- (schema-version 1 :type fixnum)
 )
 
 (defun item-write-to-stream (item stream)
  (let ((raw-user-id (fixnum-to-word-bytes (item-user-id item)))
        (raw-schema-id (fixnum-to-word-bytes (item-schema-version item))))
+  (write-sequence raw-schema-id stream)
   (write-sequence raw-user-id stream)
   (write-sequence (item-acl-uuid item) stream)
   (write-sequence (item-list-uuid item) stream)
   (write-sequence (item-parent-uuid item) stream)
   (write-sequence (item-content-ref item) stream)
-  (write-sequence raw-schema-id stream)
  )
 )
 
@@ -94,12 +111,12 @@
         (user-id (make-array +word-size+ :element-type '(unsigned-byte 8)))
         (schema-version (make-array +word-size+ :element-type '(unsigned-byte 8)))
        )
+   (read-sequence schema-version stream :start 0 :end +word-size+)
    (read-sequence user-id stream :start 0 :end +word-size+)
    (read-sequence acl-uuid stream :start 0 :end +sha1-size+)
    (read-sequence list-uuid stream :start 0 :end +uuid-size+)
    (read-sequence parent-uuid stream :start 0 :end +uuid-size+)
    (read-sequence content-ref stream :start 0 :end +sha1-size+)
-   (read-sequence schema-version stream :start 0 :end +word-size+)
    (setf (item-uuid item) uuid)
    (setf (item-acl-uuid item) acl-uuid)
    (setf (item-list-uuid item) list-uuid)
@@ -151,6 +168,23 @@
    )
   )
   acl-id
+ )
+)
+
+(defun acl-is-member-of (acl-id user-id)
+ (let ((result))
+  (with-hex-named-file (:input nil nil "acl_list" acl-id file file-name)
+   (let ((scratch (make-array 4 :element-type '(unsigned-byte 8))))
+    (labels ((recursive-acl-is-member-of (user-id file)
+              (read-sequence scratch file)
+              (if (= (word-bytes-to-fixnum scratch) user-id)
+               t
+               (recursive-acl-is-member-of user-id file))))
+     (setf result (recursive-acl-is-member-of user-id file))
+    )
+   )
+  )
+  result
  )
 )
 
