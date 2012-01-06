@@ -64,8 +64,8 @@
      (progn
       (let ((json-assoc '()))
        (push '(:success . "true") json-assoc)
-       (push `(:content . ,(data-load (item-content-ref item))) json-assoc)
-       (push `(:content . ,(item-get-list-as-strings item)) json-assoc)
+       (push `(:content . ,(flexi-streams:octets-to-string (data-load (item-content-ref item)))) json-assoc)
+       (push `(:children . ,(item-get-list-as-strings item)) json-assoc)
        (json:encode-json-to-string json-assoc))
      )
      (setf (return-code*) +http-forbidden+))
@@ -82,7 +82,7 @@
         (content-ref (data-store-string (cdr (assoc :data json-data))))
         (item (item-create user-id uuid content-ref)))
   (with-connection *db-connection-parameters*
-   (execute (:insert-into 'posts :set 'user_id user-id 'item_id (item-uuid item)))
+   (execute (:insert-into 'posts :set 'user_id user-id 'item_id (byte-vector-to-hex-string (item-uuid item))))
   )
  )
  *successful-post-response*
