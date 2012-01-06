@@ -15,7 +15,7 @@
    (:create-table posts
     ((post_id :type serial :primary-key t)
      (user_id :type integer)
-     (content_id :type 'uuid))
+     (item_id :type bytea))
    )
 ;   (:create-table locations
 ;    ((location_id :type serial :primary-key t)
