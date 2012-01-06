@@ -41,7 +41,7 @@
 
 (defun content-get-user-id (json-data)
  (if *session*
-  (session-value 'id session)
+  (session-value 'id *session*)
   (let ((email (cdr (assoc :email json-data))))
    (if (null email)
     nil
@@ -56,9 +56,20 @@
  (assert (null json-data))
  (let ((item (item-load uuid))
        (user-id (content-get-user-id json-data)))
-  (if (acl-is-member-of (item-acl-ref item) user-id)
-   "correctly handle retrieving data here"
-   "correctly handle an ACL authentication failure here"
+  (if (null user-id)
+   (setf (return-code*) +http-forbidden+)
+   (if (null item)
+    (setf (return-code*) +http-not-found+)
+    (if (acl-is-member-of (item-acl-ref item) user-id)
+     (progn
+      (let ((json-assoc '()))
+       (push '(:success . "true") json-assoc)
+       (push `(:content . ,(data-load (item-content-ref item))) json-assoc)
+       (push `(:content . ,(item-get-list-as-strings item)) json-assoc)
+       (json:encode-json-to-string json-assoc))
+     )
+     (setf (return-code*) +http-forbidden+))
+   )
   )
  )
 )
@@ -84,12 +95,12 @@
                   (to-uuid uuid-or-alias-string)
                   *null-uuid*))
         (raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8))
-        (json-post-data (if (not (null raw-json-string)) 
-                            (json:decode-json-from-string raw-json-string)
-                            nil)))
+        (json-post-data (if (or (null raw-json-string) (string= raw-json-string "")) 
+                            nil
+                            (json:decode-json-from-string raw-json-string))))
   (cond ((eq req :get) (content-handle-get uuid json-post-data))
         ((eq req :post) (content-handle-post uuid json-post-data))
-        (t (setf (return-code* *request*) +http-bad-request+))
+        (t (setf (return-code*) +http-bad-request+))
   )
  )
 )
