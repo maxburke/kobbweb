@@ -257,25 +257,40 @@
  )
 )
 
+(declaim (inline memcpy))
+(defun memcpy (dest src dest-offset src-offset size)
+ (assert (<= (+ size src-offset) (length src)))
+ (assert (<= (+ size dest-offset) (length dest)))
+ (loop for i from 0 to (1- size)
+  do
+  (setf (aref dest (+ i dest-offset)) (aref src (+ i src-offset)))
+ )
+)
+
+(defun item-get-list-as-strings (item)
+ (let ((children '())
+       (list-bytes (cas-load (item-list-ref item) "lists"))
+       (item (make-array +uuid-size+ :element-type '(unsigned-byte 8))))
+  (loop for i from 0 to (1- (length list-bytes)) by +uuid-size+
+   do
+   (memcpy item list-bytes 0 i +uuid-size+)
+   (push (byte-vector-to-hex-string item) children)
+  )
+  children
+ )
+)
+
 (defun item-add-to-list (item-uuid child-uuid)
+ ;; TODO: This isn't entirely atomic and will need to be revisited later.
+ ;; This function should check the list for the child uuid and if it can't
+ ;; be found then add it, in a loop, in case some other source is modifying
+ ;; this same structure.
  (let* ((item (item-load item-uuid))
         (list (cas-load (item-list-ref item) "lists"))
         (new-list (make-array (+ (length list) +uuid-size+) :element-type '(unsigned-byte 8)))
         (new-list-ref))
-  (labels ((memcpy (dest src dest-offset)
-            (let ((src-idx 0)
-                  (dest-idx dest-offset)
-                  (src-length (length src))
-                  (dest-length (length dest)))
-             (assert (<= src-length (- dest-length dest-idx)))
-             (loop for i from 0 to (1- src-length)
-              do
-              (setf (aref dest (+ i dest-offset)) (aref src i))
-             )
-            )))
-   (memcpy new-list child-uuid 0)
-   (memcpy new-list list +uuid-size+)
-  )
+  (memcpy new-list child-uuid 0 0 +uuid-size+)
+  (memcpy new-list list +uuid-size+ 0 (length list))
   (setf new-list-ref (cas-store new-list "lists"))
   (setf (item-list-ref item) new-list-ref)
   (item-store item)
