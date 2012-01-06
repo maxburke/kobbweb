@@ -56,7 +56,7 @@
  (assert (null json-data))
  (let ((item (item-load uuid))
        (user-id (content-get-user-id json-data)))
-  (if (acl-is-member-of (item-acl-uuid item) user-id)
+  (if (acl-is-member-of (item-acl-ref item) user-id)
    "correctly handle retrieving data here"
    "correctly handle an ACL authentication failure here"
   )

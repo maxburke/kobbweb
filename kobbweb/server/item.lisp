@@ -4,15 +4,17 @@
 ;;; UUIDs are all represented as byte vectors. Always.
 (defvar *uuid-lock* (sb-thread:make-mutex :name "uuid lock"))
 (defvar *null-uuid* (uuid:uuid-to-byte-array (uuid:make-null-uuid)))
+(defvar *null-digest*)
 (defvar *last-uuid* *null-uuid*)
 
+(declaim (inline uuid=))
 (defun uuid= (uuid1 uuid2)
  (reduce (lambda (x y) (and x y)) (map 'vector #'= uuid1 uuid2))
 )
 
 (defvar *hex-chars* "0123456789abcdef")
 (defun byte-vector-to-hex-string (byte-vector)
- (let ((output (make-array (* 2 (length byte-vector))))
+ (let ((output (make-array (* 2 (length byte-vector)) :element-type 'character))
        (idx 0))
   (loop for b across byte-vector
    do
@@ -59,6 +61,7 @@
 )
 
 (defun fixnum-to-word-bytes (num)
+ (declare (type fixnum num))
  (let ((seq (make-array 4 :element-type '(unsigned-byte 8))))
   (setf (aref seq 0) (logand num 255))
   (setf (aref seq 1) (logand (ash num -8) 255))
@@ -82,8 +85,8 @@
 (defstruct item
  (schema-version 1 :type fixnum)
  (uuid #() :type vector)
- (acl-uuid #() :type vector)
- (list-uuid #() :type vector)
+ (acl-ref #() :type vector)
+ (list-ref #() :type vector)
  (parent-uuid #() :type vector)
  (content-ref #() :type vector)
  (user-id 0 :type fixnum)
@@ -94,8 +97,8 @@
        (raw-schema-id (fixnum-to-word-bytes (item-schema-version item))))
   (write-sequence raw-schema-id stream)
   (write-sequence raw-user-id stream)
-  (write-sequence (item-acl-uuid item) stream)
-  (write-sequence (item-list-uuid item) stream)
+  (write-sequence (item-acl-ref item) stream)
+  (write-sequence (item-list-ref item) stream)
   (write-sequence (item-parent-uuid item) stream)
   (write-sequence (item-content-ref item) stream)
  )
@@ -104,8 +107,8 @@
 (defun item-read-from-stream (uuid stream)
  (if (not (null stream))
   (let ((item (make-item))
-        (acl-uuid (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
-        (list-uuid (make-array +uuid-size+ :element-type '(unsigned-byte 8)))
+        (acl-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
+        (list-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
         (parent-uuid (make-array +uuid-size+ :element-type '(unsigned-byte 8)))
         (content-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
         (user-id (make-array +word-size+ :element-type '(unsigned-byte 8)))
@@ -113,13 +116,13 @@
        )
    (read-sequence schema-version stream :start 0 :end +word-size+)
    (read-sequence user-id stream :start 0 :end +word-size+)
-   (read-sequence acl-uuid stream :start 0 :end +sha1-size+)
-   (read-sequence list-uuid stream :start 0 :end +uuid-size+)
+   (read-sequence acl-ref stream :start 0 :end +sha1-size+)
+   (read-sequence list-ref stream :start 0 :end +sha1-size+)
    (read-sequence parent-uuid stream :start 0 :end +uuid-size+)
    (read-sequence content-ref stream :start 0 :end +sha1-size+)
    (setf (item-uuid item) uuid)
-   (setf (item-acl-uuid item) acl-uuid)
-   (setf (item-list-uuid item) list-uuid)
+   (setf (item-acl-ref item) acl-ref)
+   (setf (item-list-ref item) list-ref)
    (setf (item-parent-uuid item) parent-uuid)
    (setf (item-content-ref item) content-ref)
    (setf (item-user-id item) (word-bytes-to-fixnum user-id))
@@ -133,7 +136,7 @@
 (defmacro with-hex-named-file ((direction does-not-exist exists root name-buffer stream file-path-var) &body body)
  (let ((file-name-var (gensym)))
   `(let* ((,file-name-var (byte-vector-to-hex-string ,name-buffer))
-          (,file-path-var (make-pathname :directory '(:relative "data" ,root) :name ,file-name-var))
+          (,file-path-var (make-pathname :directory (list :relative "data" ,root) :name ,file-name-var))
           (,stream (open ,file-path-var
                :element-type '(unsigned-byte 8) 
                :direction ,direction 
@@ -158,16 +161,8 @@
 )
 
 (defun acl-create-default (user-id)
- (let ((bytes (fixnum-to-word-bytes user-id))
-       (acl-id))
-  (with-sha1-digest (digest bytes)
-   (with-hex-named-file (:output nil nil "acl_list" digest stream file-name)
-    (if (not (null stream))
-     (write-sequence bytes stream))
-    (setf acl-id digest)
-   )
-  )
-  acl-id
+ (let ((bytes (fixnum-to-word-bytes user-id)))
+  (cas-store bytes "acl_list")
  )
 )
 
@@ -188,9 +183,9 @@
  )
 )
 
-(defun data-load (content-ref)
+(defun cas-load (content-ref hive)
  (let ((content))
-  (with-hex-named-file (:input nil nil "data" content-ref file file-name)
+  (with-hex-named-file (:input nil nil hive content-ref file file-name)
    (let* ((content-length (file-length file))
           (content-storage (make-array content-length :element-type '(unsigned-byte 8))))
     (assert (not (null content-length)))
@@ -202,12 +197,12 @@
  )
 )
 
-(defun data-store-octets (content)
+(defun cas-store (content hive)
  (let ((content-ref))
   (with-sha1-digest (digest content)
 
    ; Data store files are set to create if they do not exist and return nil if they do
-   (with-hex-named-file (:output :create nil "data" digest stream file-name)
+   (with-hex-named-file (:output :create nil hive digest stream file-name)
     (setf content-ref digest)
 
     ; If we have a valid file stream then write the contents to it.
@@ -223,6 +218,14 @@
   )
   content-ref
  )
+)
+
+(defun data-load (content-ref)
+ (cas-load content-ref "data")
+)
+
+(defun data-store-octets (content)
+ (cas-store content "data")
 )
 
 (defun data-store-string (string)
@@ -249,34 +252,66 @@
 (defun item-get-acl-from-parent (parent-uuid)
  (let ((item (item-load parent-uuid)))
   (if (not (null item))
-   (item-parent-uuid item)
+   (item-acl-ref item)
   )
  )
 )
 
+(defun item-add-to-list (item-uuid child-uuid)
+ (let* ((item (item-load item-uuid))
+        (list (cas-load (item-list-ref item) "lists"))
+        (new-list (make-array (+ (length list) +uuid-size+) :element-type '(unsigned-byte 8)))
+        (new-list-ref))
+  (labels ((memcpy (dest src dest-offset)
+            (let ((src-idx 0)
+                  (dest-idx dest-offset)
+                  (src-length (length src))
+                  (dest-length (length dest)))
+             (assert (<= src-length (- dest-length dest-idx)))
+             (loop for i from 0 to (1- src-length)
+              do
+              (setf (aref dest (+ i dest-offset)) (aref src i))
+             )
+            )))
+   (memcpy new-list child-uuid 0)
+   (memcpy new-list list +uuid-size+)
+  )
+  (setf new-list-ref (cas-store new-list "lists"))
+  (setf (item-list-ref item) new-list-ref)
+  (item-store item)
+ )
+)
+
+(with-sha1-digest (digest (make-array 0 :element-type '(unsigned-byte 8)))
+ (setf *null-digest* digest)
+)
+
 (defun item-create (user-id parent-uuid content-ref)
- (let ((acl-uuid nil)
+ (let ((acl-ref nil)
        (uuid (uuid-next)))
 
   (if (null parent-uuid)
    (progn (setf parent-uuid *null-uuid*)
-          (setf acl-uuid (acl-create-default user-id))
+          (setf acl-ref (acl-create-default user-id))
    )
-   (progn (setf acl-uuid (item-get-acl-from-parent parent-uuid))
+   (progn (setf acl-ref (item-get-acl-from-parent parent-uuid))
    )
   )
 
   (if (null content-ref)
-   (setf content-ref (make-array 20 :element-type '(unsigned-byte 8))))
+   (setf content-ref *null-digest*))
 
   (let ((item (make-item 
                :uuid uuid
-               :acl-uuid acl-uuid
-               :list-uuid *null-uuid*
+               :acl-ref acl-ref
+               :list-ref *null-digest*
                :parent-uuid parent-uuid
                :content-ref content-ref
                :user-id user-id)))
    (item-store item)
+   (when (not (uuid= parent-uuid *null-uuid*))
+    (item-add-to-list parent-uuid uuid)
+   )
    item)
  )
 )
