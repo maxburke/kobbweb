@@ -64,7 +64,8 @@
      (progn
       (let ((json-assoc '()))
        (push '(:success . "true") json-assoc)
-       (push `(:content . ,(flexi-streams:octets-to-string (data-load (item-content-ref item)))) json-assoc)
+       (push `(:parent . ,(byte-vector-to-hex-string (item-parent-uuid item))) json-assoc)
+       (push `(:content-ref . ,(byte-vector-to-hex-string (item-content-ref item))) json-assoc)
        (push `(:children . ,(item-get-list-as-strings item)) json-assoc)
        (json:encode-json-to-string json-assoc))
      )
