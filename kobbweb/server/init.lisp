@@ -37,10 +37,13 @@
  (setf *dispatch-table*
   (nconc (list 'dispatch-easy-handlers
           (create-folder-dispatcher-and-handler "/static/" #p"static/")
-          (create-prefix-dispatcher "/sessions" 'sessions-handler)
-          (create-prefix-dispatcher "/content" 'content-handler)
-          (create-prefix-dispatcher "/" 'index-handler)
+          (create-prefix-dispatcher "/sessions" #'sessions-handler)
+          (create-prefix-dispatcher "/content" (uri-dispatcher #'content-handler))
+          (create-prefix-dispatcher "/home" #'home-handler)
+          (create-prefix-dispatcher "/data" (uri-dispatcher #'data-handler))
+          (create-prefix-dispatcher "/posts" (uri-dispatcher #'posts-handler))
+          (create-prefix-dispatcher "/" #'index-handler)
           ; TODO:
           ; Add special pages (ie, /500, /404) that have custom error messages for certain conditions.
-          'default-dispatcher))))
+          #'default-dispatcher))))
 

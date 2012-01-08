@@ -13,7 +13,7 @@
  )
 )
 
-(defun posts-handler ()
+(defun posts-handler (uri)
  (if *session*
   (posts-fetch (session-value 'id *session*))
   (setf (return-code*) +http-forbidden+)
