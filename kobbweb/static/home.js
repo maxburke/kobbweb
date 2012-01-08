@@ -65,6 +65,10 @@ fetchData = function(contentRef, callback) {
     }
 }
 
+addToDataCache = function(contentRef, data) {
+    kw.Data[contentRef] = data;
+}
+
 kw.Models.Item = Backbone.Model.extend({
     clear : function() {
         this.destroy();
@@ -89,11 +93,11 @@ kw.Views.newItemView = Backbone.View.extend({
         'click .submit' : 'submitNewItem'
     },
     initialize : function() {
-        _.bindAll(this, 'render', 'submitNewItem');
+        _.bindAll(this, 'render', 'submitNewItem', 'submitSuccess', 'submitError');
     },
-    setParent : function(parentView) {
+    setParent : function(parentView, parentUuid) {
         this.parentView = parentView;
-        this.parentUuid = parentView.parentUuid;
+        this.parentUuid = parentUuid;
     },
     render : function() {
         $(this.el).append('<form><fieldset>'
@@ -107,8 +111,55 @@ kw.Views.newItemView = Backbone.View.extend({
         this.$('.autosize').autoGrow();
         return this;
     },
+    submitError : function (obj) {
+        this.$('.autosize').removeAttr('disabled');
+        this.$('.submit').removeAttr('disabled');
+        alert("error!");
+    },
+    submitSuccess : function(modelData) {
+        kw.ItemCache.add(modelData);
+        this.parentView.addNewChild(modelData);
+
+        this.$('.autosize').removeAttr('disabled');
+        this.$('.submit').removeAttr('disabled');
+    },
     submitNewItem : function() {
-        alert("kw.Views.newItemView.submitNewItem()");
+        this.$('.autosize').attr('disabled', true);
+        this.$('.submit').attr('disabled', true);
+
+        var obj = this;
+        var requestText = this.$('.autosize').val();
+        var submitSuccess = this.submitSuccess;
+        var dataSubmitData = JSON.stringify({ 
+            data : requestText
+        });
+        var parentUuid = this.parentUuid;
+        var dataPost = {
+            url : '/data',
+            type : 'POST',
+            text : 'json',
+            data : dataSubmitData,
+            processData : false,
+            success : function (data, textStatus, jqXHR) {
+                var contentSubmitData = JSON.stringify({
+                    data : data,
+                });
+                addToDataCache(data, requestText);
+                var contentPost = {
+                    url : '/content/' + parentUuid,
+                    type : 'POST',
+                    dataType : 'json',
+                    data : contentSubmitData,
+                    processData : false,
+                    success : function(returnedData, textStatus, jqXHR) {
+                        returnedData.content = requestText;
+                        submitSuccess(returnedData);
+                    }
+                };
+                $.ajax(contentPost);
+            }
+        };
+        $.ajax(dataPost);
         // submit item
         // send message to parentView to add new child to its collection.
         // I need to better think of the data + data flows here methinks.???
@@ -118,7 +169,7 @@ kw.Views.newItemView = Backbone.View.extend({
 kw.Views.itemDetailView = Backbone.View.extend({
     el : '#app',
     initialize : function(model) {
-        _.bindAll(this, 'close', 'render');
+        _.bindAll(this, 'close', 'render', 'addNewChild');
 
         this.model = model;
         this.parentUuid = model.get("parent");
@@ -132,6 +183,14 @@ kw.Views.itemDetailView = Backbone.View.extend({
     },
     close : function() {
         $(this.el).empty();
+    },
+    addNewChild : function(modelData) {
+        modelData.idx = this.items.length;
+        this.items.add(modelData);
+        var parentElement = $('#children');
+        var view = new kw.Views.itemSummaryView({ model : this.items.at(modelData.idx) });
+        var child = view.render().el;
+        parentElement.prepend(child);
     },
     renderChildren : function() {
         var children = this.model.get("children");
@@ -160,11 +219,12 @@ kw.Views.itemDetailView = Backbone.View.extend({
         $(this.el).append('<div class="row"><div class="span1"></div><div id="detail" class="span15">detail goes here</div></div>');
 
         var newItemView = new kw.Views.newItemView;
-        newItemView.setParent(this);
+        newItemView.setParent(this, this.model.get("id"));
         var html = newItemView.render().el;
         $(this.el).append(html);
 
         this.renderChildren();
+
         return this;
     }
 });
@@ -179,9 +239,14 @@ kw.Views.itemSummaryView = Backbone.View.extend({
         kw.Detail = new kw.Views.itemDetailView(this.model);
     },
     render : function () {
+        if (typeof this.model === 'undefined') {
+            alert("undefined");
+        }
+
         var jsonModel = this.model.toJSON();
         var template = this.template(jsonModel);
         $(this.el).html(template);
+        $(this.el).twipsy({ animate: false, delayIn : 500, fallback : 'Double-click for detail view', placement : 'below', title : function() { return 'Double-click for detail view'; } });
         return this;
     }
 });
@@ -189,7 +254,7 @@ kw.Views.itemSummaryView = Backbone.View.extend({
 kw.Views.AppView = Backbone.View.extend({
     el : '#app',
     initialize : function() {
-        _.bindAll(this, 'addEntries', 'close', 'render');
+        _.bindAll(this, 'addEntries', 'close', 'render', 'addNewChild');
         this.items = new kw.Collections.ItemCollection;
         this.parentUuid = NULL_ID;
 
@@ -208,7 +273,7 @@ kw.Views.AppView = Backbone.View.extend({
     render : function() {
         $(this.el).append('<h3>Post new item!</h3>');
         var newItemView = new kw.Views.newItemView;
-        newItemView.setParent(this);
+        newItemView.setParent(this, NULL_ID);
         var html = newItemView.render().el;
         $(this.el).append(html);
 
@@ -259,6 +324,14 @@ kw.Views.AppView = Backbone.View.extend({
         for (var i = 0; i < itemList.length; ++i) {
             this.fetchEntry(itemList, i);
         }
+    },
+    addNewChild : function(modelData) {
+        modelData.idx = this.items.length;
+        this.items.add(modelData);
+        var parentElement = $('#post-list');
+        var view = new kw.Views.itemSummaryView({ model : this.items.at(modelData.idx) });
+        var child = view.render().el;
+        parentElement.prepend(child);
     }
 });
 
