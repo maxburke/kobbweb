@@ -83,11 +83,46 @@ kw.Collections.ItemCollection = Backbone.Collection.extend({
 
 kw.ItemCache = new kw.Collections.ItemCollection;
 
+kw.Views.newItemView = Backbone.View.extend({
+    className : 'newItem',
+    events : {
+        'click .submit' : 'submitNewItem'
+    },
+    initialize : function() {
+        _.bindAll(this, 'render', 'submitNewItem');
+    },
+    setParent : function(parentView) {
+        this.parentView = parentView;
+        this.parentUuid = parentView.parentUuid;
+    },
+    render : function() {
+        $(this.el).append('<form><fieldset>'
+            +'<div class="clearfix">'
+            +    '<label for="autosize">Post a new item!</label>'
+            +     '<div class="input">'
+            +         '<textarea class="autosize" cols="80" rows="5"></textarea>'
+            +     '</div>'
+            + '</div></fieldset></form>');
+        $(this.el).append('<div class="actions"><button class="btn primary submit" type="button">Submit</button></div>');
+        this.$('.autosize').autoGrow();
+        return this;
+    },
+    submitNewItem : function() {
+        alert("kw.Views.newItemView.submitNewItem()");
+        // submit item
+        // send message to parentView to add new child to its collection.
+        // I need to better think of the data + data flows here methinks.???
+    }
+});
+
 kw.Views.itemDetailView = Backbone.View.extend({
     el : '#app',
     initialize : function(model) {
         _.bindAll(this, 'close', 'render');
+
         this.model = model;
+        this.parentUuid = model.get("parent");
+
         this.items = new kw.Collections.ItemCollection;
         this.items.bind('add', this.addEntry, this);
         this.items.bind('reset', this.addAllEntries, this);
@@ -123,7 +158,14 @@ kw.Views.itemDetailView = Backbone.View.extend({
         }
 
         $(this.el).append('<div class="row"><div class="span1"></div><div id="detail" class="span15">detail goes here</div></div>');
+
+        var newItemView = new kw.Views.newItemView;
+        newItemView.setParent(this);
+        var html = newItemView.render().el;
+        $(this.el).append(html);
+
         this.renderChildren();
+        return this;
     }
 });
 
@@ -149,6 +191,7 @@ kw.Views.AppView = Backbone.View.extend({
     initialize : function() {
         _.bindAll(this, 'addEntries', 'close', 'render');
         this.items = new kw.Collections.ItemCollection;
+        this.parentUuid = NULL_ID;
 
         var ajaxRequest = {
             url : '/posts',
@@ -163,6 +206,12 @@ kw.Views.AppView = Backbone.View.extend({
         $(this.el).empty();
     },
     render : function() {
+        $(this.el).append('<h3>Post new item!</h3>');
+        var newItemView = new kw.Views.newItemView;
+        newItemView.setParent(this);
+        var html = newItemView.render().el;
+        $(this.el).append(html);
+
         $(this.el).append('<h3>Most recent items</h3>');
         $(this.el).append('<ul id="post-list"></ul>');
         var parentElement = $('#post-list');
@@ -198,6 +247,11 @@ kw.Views.AppView = Backbone.View.extend({
             }
         };
         $.ajax(ajaxRequest);
+    },
+    addEntry : function(model) {
+        alert("add an entry here. you might need to change the collection comparator here to sort in reverse order. "
+            + "THEN change the idx's assigned to the entries to be (numItems - i) instead of i so that new entries "
+            + "are added to the right part of the array and, when sorted end up appearing at the top of the list.");
     },
     addEntries : function(itemList) {
         this.expectedNumModels = itemList.length;
