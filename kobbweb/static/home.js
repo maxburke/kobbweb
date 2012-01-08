@@ -15,8 +15,37 @@ var kw = {
     Templates : { itemSummaryViewTemplate : ITEM_SUMMARY_VIEW_TEMPLATE },
     Data : { },
     ItemCache : { },
+    ViewStack : null,
     init : function() { return null; }
 };
+
+viewStackPush = function(view) {
+    if (kw.ViewStack !== null) {
+        kw.ViewStack.close();
+        $('#back').removeAttr('disabled');
+    }
+
+    view.nextView = kw.ViewStack;
+    kw.ViewStack = view;
+    kw.ViewStack.render();
+}
+
+viewStackPop = function() {
+    var topElement = kw.ViewStack;
+    kw.ViewStack.close();
+    kw.ViewStack = kw.ViewStack.nextView;
+    kw.ViewStack.render();
+
+    if (kw.ViewStack.nextView === null) {
+        $('#back').attr('disabled', true);
+    }
+
+    return topElement;
+}
+
+viewStackPeek = function () {
+    return kw.ViewStack;
+}
 
 fetchData = function(contentRef, callback) {
     if (typeof kw.Data[contentRef] === 'undefined') {
@@ -64,16 +93,10 @@ kw.Views.itemDetailView = Backbone.View.extend({
         this.items.bind('reset', this.addAllEntries, this);
         this.items.bind('all', this.render, this);
 
-        // Create a 'stack' of views from which we can create breadcrumbs later.
-        this.previousView = kw.App;
-        kw.App = this;
-
-        this.render();
+        viewStackPush(this);
     },
     close : function() {
         $(this.el).empty();
-        kw.App = this.previousView;
-        kw.App.render();
     },
     renderChildren : function() {
         var children = this.model.get("children");
@@ -95,11 +118,10 @@ kw.Views.itemDetailView = Backbone.View.extend({
         parentElement.append(parentView.render().el);
     },
     render : function() {
-        $(this.el).append('<button type="button" id="close" class="btn primary">Close</button>');
-        $('#close').click(this.close);
         if (this.model.get("parent") !== NULL_ID) {
             this.renderParent();
         }
+
         $(this.el).append('<div class="row"><div class="span1"></div><div id="detail" class="span15">detail goes here</div></div>');
         this.renderChildren();
     }
@@ -112,7 +134,6 @@ kw.Views.itemSummaryView = Backbone.View.extend({
         'dblclick .item-summary' : 'explodeItem'
     },
     explodeItem : function() {
-        kw.App.close();
         kw.Detail = new kw.Views.itemDetailView(this.model);
     },
     render : function () {
@@ -154,7 +175,7 @@ kw.Views.AppView = Backbone.View.extend({
     },
     modelLoadedCallback : function() {
         if (++this.numModelsLoaded === this.expectedNumModels) {
-            this.render();
+            viewStackPush(this);
         }
     },
     fetchEntry : function(itemList, i) {
@@ -189,5 +210,6 @@ kw.Views.AppView = Backbone.View.extend({
 
 kw.init = function() {
     kw.App = new kw.Views.AppView();
+    $('#back').click(viewStackPop);
 }
 
