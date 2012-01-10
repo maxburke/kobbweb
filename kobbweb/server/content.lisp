@@ -16,10 +16,10 @@
            (declare (type fixnum i length)
                     (type simple-string str))
            (if (= i length)
-            t
-            (if (is-hex-char (char str i))
-             (recursive-contains-only-hex-chars str (1+ i) length)
-             nil))))
+               t
+               (if (is-hex-char (char str i))
+                   (recursive-contains-only-hex-chars str (1+ i) length)
+                   nil))))
   (recursive-contains-only-hex-chars string 0 (length string)))
 )
 
@@ -36,19 +36,27 @@
  )
 )
 
-(defun validate-access (uuid)
-)
-
 (defun content-get-user-id (json-data)
  (if *session*
   (session-value 'id *session*)
   (let ((email (cdr (assoc :email json-data))))
    (if (null email)
-    nil
-    (with-connection *db-connection-parameters*
-     (fetch-user-id email))
+       nil
+       (with-connection *db-connection-parameters*
+        (fetch-user-id email))
    )
   )
+ )
+)
+
+(defun create-json-item (item)
+ (let ((json-assoc '()))
+  (push '(:success . "true") json-assoc)
+  (push `(:parent . ,(byte-vector-to-hex-string (item-parent-uuid item))) json-assoc)
+  (push `(:content-ref . ,(byte-vector-to-hex-string (item-content-ref item))) json-assoc)
+  (push `(:children . ,(item-get-list-as-strings item)) json-assoc)
+  (push `(:id . ,(byte-vector-to-hex-string (item-uuid item))) json-assoc)
+  (json:encode-json-to-string json-assoc)
  )
 )
 
@@ -57,36 +65,38 @@
  (let ((item (item-load uuid))
        (user-id (content-get-user-id json-data)))
   (if (null user-id)
-   (setf (return-code*) +http-forbidden+)
-   (if (null item)
-    (setf (return-code*) +http-not-found+)
-    (if (acl-is-member-of (item-acl-ref item) user-id)
-     (progn
-      (let ((json-assoc '()))
-       (push '(:success . "true") json-assoc)
-       (push `(:parent . ,(byte-vector-to-hex-string (item-parent-uuid item))) json-assoc)
-       (push `(:content-ref . ,(byte-vector-to-hex-string (item-content-ref item))) json-assoc)
-       (push `(:children . ,(item-get-list-as-strings item)) json-assoc)
-       (json:encode-json-to-string json-assoc))
-     )
-     (setf (return-code*) +http-forbidden+))
-   )
+      (progn
+            (setf (return-code*) +http-forbidden+)
+            "Forbidden!")
+      (if (null item)
+          (progn
+                (setf (return-code*) +http-not-found+)
+                "Not found!")
+          (if (acl-is-member-of (item-acl-ref item) user-id)
+              (create-json-item item)
+              (progn
+                    (setf (return-code*) +http-forbidden+)
+                    "Forbidden!")
+          )
+      )
   )
  )
+)
+
+(defun content-record-new-post (user-id item)
+ (with-connection *db-connection-parameters*
+  (execute (:insert-into 'posts :set 'user_id user-id 'item_id (byte-vector-to-hex-string (item-uuid item)))))
 )
 
 (defvar *successful-post-response* (json:encode-json-to-string '((:success . "true"))))
 (defun content-handle-post (uuid json-data)
  (assert (not (null json-data)))
- (let* ((content-ref)
-        (user-id (content-get-user-id json-data))
-        (content-ref (data-store-string (cdr (assoc :data json-data))))
+ (let* ((user-id (content-get-user-id json-data))
+        (content-ref (hex-string-to-byte-vector (cdr (assoc :data json-data))))
         (item (item-create user-id uuid content-ref)))
-  (with-connection *db-connection-parameters*
-   (execute (:insert-into 'posts :set 'user_id user-id 'item_id (byte-vector-to-hex-string (item-uuid item))))
-  )
+  (content-record-new-post user-id item)
+  (create-json-item item)
  )
- *successful-post-response*
 )
 
 (defun content-handler (uri)
@@ -101,7 +111,9 @@
                             (json:decode-json-from-string raw-json-string))))
   (cond ((eq req :get) (content-handle-get uuid json-post-data))
         ((eq req :post) (content-handle-post uuid json-post-data))
-        (t (setf (return-code*) +http-bad-request+))
+        (t (progn 
+                 (setf (return-code*) +http-bad-request+)
+                 "Bad request!"))
   )
  )
 )

@@ -51,8 +51,8 @@
    (labels ((recursive-create-next-uuid ()
              (setf uuid (uuid:uuid-to-byte-array (uuid:make-v1-uuid)))
              (if (uuid= uuid *last-uuid*)
-              (recursive-create-next-uuid)
-              (setf *last-uuid* uuid))))
+                 (recursive-create-next-uuid)
+                 (setf *last-uuid* uuid))))
     (recursive-create-next-uuid)
    )
   )
@@ -106,30 +106,30 @@
 
 (defun item-read-from-stream (uuid stream)
  (if (not (null stream))
-  (let ((item (make-item))
-        (acl-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
-        (list-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
-        (parent-uuid (make-array +uuid-size+ :element-type '(unsigned-byte 8)))
-        (content-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
-        (user-id (make-array +word-size+ :element-type '(unsigned-byte 8)))
-        (schema-version (make-array +word-size+ :element-type '(unsigned-byte 8)))
-       )
-   (read-sequence schema-version stream :start 0 :end +word-size+)
-   (read-sequence user-id stream :start 0 :end +word-size+)
-   (read-sequence acl-ref stream :start 0 :end +sha1-size+)
-   (read-sequence list-ref stream :start 0 :end +sha1-size+)
-   (read-sequence parent-uuid stream :start 0 :end +uuid-size+)
-   (read-sequence content-ref stream :start 0 :end +sha1-size+)
-   (setf (item-uuid item) uuid)
-   (setf (item-acl-ref item) acl-ref)
-   (setf (item-list-ref item) list-ref)
-   (setf (item-parent-uuid item) parent-uuid)
-   (setf (item-content-ref item) content-ref)
-   (setf (item-user-id item) (word-bytes-to-fixnum user-id))
-   (setf (item-schema-version item) (word-bytes-to-fixnum schema-version))
-   item
-  )
-  nil
+     (let ((item (make-item))
+           (acl-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
+           (list-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
+           (parent-uuid (make-array +uuid-size+ :element-type '(unsigned-byte 8)))
+           (content-ref (make-array +sha1-size+ :element-type '(unsigned-byte 8)))
+           (user-id (make-array +word-size+ :element-type '(unsigned-byte 8)))
+           (schema-version (make-array +word-size+ :element-type '(unsigned-byte 8)))
+          )
+      (read-sequence schema-version stream :start 0 :end +word-size+)
+      (read-sequence user-id stream :start 0 :end +word-size+)
+      (read-sequence acl-ref stream :start 0 :end +sha1-size+)
+      (read-sequence list-ref stream :start 0 :end +sha1-size+)
+      (read-sequence parent-uuid stream :start 0 :end +uuid-size+)
+      (read-sequence content-ref stream :start 0 :end +sha1-size+)
+      (setf (item-uuid item) uuid)
+      (setf (item-acl-ref item) acl-ref)
+      (setf (item-list-ref item) list-ref)
+      (setf (item-parent-uuid item) parent-uuid)
+      (setf (item-content-ref item) content-ref)
+      (setf (item-user-id item) (word-bytes-to-fixnum user-id))
+      (setf (item-schema-version item) (word-bytes-to-fixnum schema-version))
+      item
+     )
+     nil
  )
 )
 
@@ -144,7 +144,7 @@
                :if-exists ,exists)))
     ,@body
     (if (not (null ,stream))
-     (close ,stream))
+        (close ,stream))
    )
  )
 )
@@ -173,8 +173,8 @@
     (labels ((recursive-acl-is-member-of (user-id file)
               (read-sequence scratch file)
               (if (= (word-bytes-to-fixnum scratch) user-id)
-               t
-               (recursive-acl-is-member-of user-id file))))
+                  t
+                  (recursive-acl-is-member-of user-id file))))
      (setf result (recursive-acl-is-member-of user-id file))
     )
    )
@@ -207,13 +207,13 @@
 
     ; If we have a valid file stream then write the contents to it.
     (if (not (null stream))
-     (write-sequence content stream)
+        (write-sequence content stream)
 
      ; However, if we don't have a valid file stream ensure that we it does exist.
      ; If the file doesn't exist then set the returned content ref to nil. This is
      ; a bad condition.
      (if (null (probe-file file-name))
-      (setf content-ref nil)))
+         (setf content-ref nil)))
    )
   )
   content-ref
@@ -244,7 +244,7 @@
  (let ((item))
   (with-hex-named-file (:input nil nil "items" uuid file file-name)
    (if (not (null file))
-    (setf item (item-read-from-stream uuid file))))
+       (setf item (item-read-from-stream uuid file))))
   item
  )
 )
@@ -252,7 +252,7 @@
 (defun item-get-acl-from-parent (parent-uuid)
  (let ((item (item-load parent-uuid)))
   (if (not (null item))
-   (item-acl-ref item)
+      (item-acl-ref item)
   )
  )
 )
@@ -305,16 +305,14 @@
  (let ((acl-ref nil)
        (uuid (uuid-next)))
 
-  (if (null parent-uuid)
-   (progn (setf parent-uuid *null-uuid*)
-          (setf acl-ref (acl-create-default user-id))
-   )
-   (progn (setf acl-ref (item-get-acl-from-parent parent-uuid))
-   )
+  (if (or (null parent-uuid) (uuid= parent-uuid *null-uuid*))
+      (progn (setf parent-uuid *null-uuid*)
+             (setf acl-ref (acl-create-default user-id)))
+      (progn (setf acl-ref (item-get-acl-from-parent parent-uuid)))
   )
 
   (if (null content-ref)
-   (setf content-ref *null-digest*))
+      (setf content-ref *null-digest*))
 
   (let ((item (make-item 
                :uuid uuid
@@ -325,7 +323,7 @@
                :user-id user-id)))
    (item-store item)
    (when (not (uuid= parent-uuid *null-uuid*))
-    (item-add-to-list parent-uuid uuid)
+         (item-add-to-list parent-uuid uuid)
    )
    item)
  )
