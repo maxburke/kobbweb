@@ -25,6 +25,7 @@
        (:file "home")
        (:file "data")
        (:file "posts")
+       (:file "email")
       )
     )
   )
