@@ -1,7 +1,58 @@
+var ItemCache = {};
+var DataCache = {};
+
+memoizeData = function(ref, data) {
+    DataCache[ref] = data;
+}
+
+getData = function(ref, callback) {
+    if (typeof DataCache[ref] === 'undefined') {
+        var dataRequest = {
+            url : '/data/' + ref,
+            type : 'GET',
+            dataType : 'text',
+            processData : false,
+            success : function(dataResult, textStatus, jqXHR) {
+                DataCache[ref] = dataResult;
+                callback(dataResult);
+            }
+        };
+        $.ajax(dataRequest);
+    } else {
+        callback(DataCache[ref]);
+    }
+}
+
+memoizeItem = function(item) {
+    ItemCache[item.id] = item;
+}
+
+getItem = function(uuid, callback) {
+    if (typeof ItemCache[uuid] === 'undefined') {
+        var ajaxRequest = { 
+            url : '/content/' + uuid,
+            type : 'GET',
+            dataType : 'json',
+            processData : false,
+            success : function(data, textStatus, jqXHR) {
+                getData(data.contentRef, function(dataResult, textStatus, jqXHR) {
+                    data.id = uuid;
+                    data.content = dataResult;
+                    ItemCache[uuid] = data;
+                    callback(data);
+                });
+            }
+        };
+        $.ajax(ajaxRequest);
+    } else {
+        callback(ItemCache[uuid]);
+    }
+}
 
 var ITEM_SUMMARY_VIEW_TEMPLATE = '<div class="item-summary">'
 + '<div><%= content %></div>'
 + '<div><%= (children !== null ? children.length : 0) %></div>'
++ '<div><%= id %></div>'
 + '</div>';
 
 var NULL_ID = "00000000000000000000000000000000";
@@ -47,28 +98,6 @@ viewStackPeek = function () {
     return kw.ViewStack;
 }
 
-fetchData = function(contentRef, callback) {
-    if (typeof kw.Data[contentRef] === 'undefined') {
-        var dataRequest = {
-            url : '/data/' + contentRef,
-            type : 'GET',
-            dataType : 'text',
-            processData : false,
-            success : function(dataResult, textStatus, jqXHR) {
-                kw.Data[contentRef] = dataResult;
-                callback(dataResult, textStatus, jqXHR);
-            }
-        };
-        $.ajax(dataRequest);
-    } else {
-        callback(kw.Data[contentRef], null, null);
-    }
-}
-
-addToDataCache = function(contentRef, data) {
-    kw.Data[contentRef] = data;
-}
-
 kw.Models.Item = Backbone.Model.extend({
     clear : function() {
         this.destroy();
@@ -84,8 +113,6 @@ kw.Collections.ItemCollection = Backbone.Collection.extend({
     },
     url : '/content'
 });
-
-kw.ItemCache = new kw.Collections.ItemCollection;
 
 kw.Views.newItemView = Backbone.View.extend({
     className : 'newItem',
@@ -117,7 +144,6 @@ kw.Views.newItemView = Backbone.View.extend({
         alert("error!");
     },
     submitSuccess : function(modelData) {
-        kw.ItemCache.add(modelData);
         this.parentView.addNewChild(modelData);
 
         this.$('.autosize').removeAttr('disabled');
@@ -144,7 +170,7 @@ kw.Views.newItemView = Backbone.View.extend({
                 var contentSubmitData = JSON.stringify({
                     data : data,
                 });
-                addToDataCache(data, requestText);
+                memoizeData(data, requestText);
                 var contentPost = {
                     url : '/content/' + parentUuid,
                     type : 'POST',
@@ -175,9 +201,6 @@ kw.Views.itemDetailView = Backbone.View.extend({
         this.parentUuid = model.get("parent");
 
         this.items = new kw.Collections.ItemCollection;
-        this.items.bind('add', this.addEntry, this);
-        this.items.bind('reset', this.addAllEntries, this);
-        this.items.bind('all', this.render, this);
 
         viewStackPush(this);
     },
@@ -193,23 +216,34 @@ kw.Views.itemDetailView = Backbone.View.extend({
         parentElement.prepend(child);
     },
     renderChildren : function() {
+        $(this.el).append('<div class="row">'
+                + '<div class="span2"></div>'
+                + '<div class="span14">'
+                +     'children go here'
+                +     '<ul id="children"></ul>'
+                + '</div></div>');
+
         var children = this.model.get("children");
         if (children !== null) {
-            $(this.el).append('<div class="row"><div class="span2"></div><div class="span14">children go here<ul id="children"></ul></div></div>');
             var childrenElement = $('#children');
+
             for (var i = 0; i < children.length; ++i) {
-                var childModel = kw.ItemCache.get(children[i]);
-                var childView = new kw.Views.itemSummaryView({ model : childModel });
-                childrenElement.append(childView.render().el);
+                getItem(children[i], function(childModel) {
+                    var model = new kw.Models.Item(childModel);
+                    var childView = new kw.Views.itemSummaryView({ model : model });
+                    childrenElement.append(childView.render().el);
+                });
             }
         }
     },
     renderParent : function() {
         $(this.el).append('<div class="row"><div class="span16">parent goes here<ul id="parent"</ul></div></div>');
         var parentElement = $('#parent');
-        var parentModel = kw.ItemCache.get(this.model.get("parent"));
-        var parentView = new kw.Views.itemSummaryView({ model : parentModel});
-        parentElement.append(parentView.render().el);
+        getItem(this.model.get("parent"), function(parentModel) {
+            var model = new kw.Models.Item(parentModel);
+            var parentView = new kw.Views.itemSummaryView({ model : model });
+            parentElement.append(parentView.render().el);
+        });
     },
     render : function() {
         if (this.model.get("parent") !== NULL_ID) {
@@ -295,23 +329,11 @@ kw.Views.AppView = Backbone.View.extend({
     fetchEntry : function(itemList, i) {
         var collection = this.items;
         var view = this;
-        var ajaxRequest = { 
-            url : '/content/' + itemList[i],
-            type : 'GET',
-            dataType : 'json',
-            processData : 'false',
-            success : function(data, textStatus, jqXHR) {
-                fetchData(data.contentRef, function(dataResult, textStatus, jqXHR) {
-                    data.idx = i;
-                    data.id = itemList[i];
-                    data.content = dataResult;
-                    collection.add(data);
-                    kw.ItemCache.add(data);
-                    view.modelLoadedCallback();
-                });
-            }
-        };
-        $.ajax(ajaxRequest);
+        getItem(itemList[i], function(data) {
+            data.idx = i;
+            collection.add(data);
+            view.modelLoadedCallback();
+        });
     },
     addEntry : function(model) {
         alert("add an entry here. you might need to change the collection comparator here to sort in reverse order. "
@@ -339,4 +361,3 @@ kw.init = function() {
     kw.App = new kw.Views.AppView();
     $('#back').click(viewStackPop);
 }
-
