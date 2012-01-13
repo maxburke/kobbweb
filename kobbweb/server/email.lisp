@@ -21,21 +21,14 @@
 )
 
 (defun email-handle-post ()
-  (let ((post-data (raw-post-data :request *request*)))
-   (if (or (null post-data) (string= post-data ""))
-       (progn
-            (setf (return-code*) +http-bad-request+)
-            "Bad request!")
-       (let* ((json (json:decode-json-from-string post-data))
-              (uuid (email-trim-and-resolve (cdr (assoc :to json))))
-              (user-id (email-retrieve-user-id (cdr (assoc :from json))))
-              (data (cdr (assoc :data json))))
-        (email-handle-insertion uuid user-id data)
-        *successful-post-response*
-       )
-   )
-  )
+ (let* ((uuid (email-trim-and-resolve (post-parameter "to")))
+        (user-id (email-retrieve-user-id (post-parameter "from")))
+        (data (post-parameter "data")))
+  (email-handle-insertion uuid user-id data)
+  *successful-post-response*
+ )
 )
+
 
 (defun email-handler ()
  (let ((req (request-method* *request*)))
