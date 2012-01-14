@@ -1,3 +1,24 @@
+var ITEM_SUMMARY_VIEW_TEMPLATE = '<div class="item-summary">'
++ '<div><pre><%= contentSummary %></pre></div>'
+//+ '<div><%= (children !== null ? children.length : 0) %></div>'
+//+ '<div><%= id %></div>'
++ '</div>';
+
+var NULL_ID = "00000000000000000000000000000000";
+
+var kw = {
+    Models : { },
+    App : { },
+    Detail : { },
+    Views : { },
+    Collections : { },
+    Templates : { itemSummaryViewTemplate : ITEM_SUMMARY_VIEW_TEMPLATE },
+    Data : { },
+    ItemCache : { },
+    ViewStack : null,
+    init : function() { return null; }
+};
+
 var ItemCache = {};
 var DataCache = {};
 
@@ -48,27 +69,6 @@ getItem = function(uuid, callback) {
         callback(ItemCache[uuid]);
     }
 }
-
-var ITEM_SUMMARY_VIEW_TEMPLATE = '<div class="item-summary">'
-+ '<div><%= content %></div>'
-+ '<div><%= (children !== null ? children.length : 0) %></div>'
-+ '<div><%= id %></div>'
-+ '</div>';
-
-var NULL_ID = "00000000000000000000000000000000";
-
-var kw = {
-    Models : { },
-    App : { },
-    Detail : { },
-    Views : { },
-    Collections : { },
-    Templates : { itemSummaryViewTemplate : ITEM_SUMMARY_VIEW_TEMPLATE },
-    Data : { },
-    ItemCache : { },
-    ViewStack : null,
-    init : function() { return null; }
-};
 
 viewStackPush = function(view) {
     if (kw.ViewStack !== null) {
@@ -131,7 +131,7 @@ kw.Views.newItemView = Backbone.View.extend({
             +'<div class="clearfix">'
             +    '<label for="autosize">Post a new item!</label>'
             +     '<div class="input">'
-            +         '<textarea class="autosize" cols="80" rows="5"></textarea>'
+            +         '<textarea class="autosize" cols="80" rows="2"></textarea>'
             +     '</div>'
             + '</div></fieldset></form>');
         $(this.el).append('<div class="actions"><button class="btn primary submit" type="button">Submit</button></div>');
@@ -217,9 +217,7 @@ kw.Views.itemDetailView = Backbone.View.extend({
     },
     renderChildren : function() {
         $(this.el).append('<div class="row">'
-                + '<div class="span2"></div>'
-                + '<div class="span14">'
-                +     'children go here'
+                + '<div>'
                 +     '<ul id="children"></ul>'
                 + '</div></div>');
 
@@ -237,12 +235,15 @@ kw.Views.itemDetailView = Backbone.View.extend({
         }
     },
     renderParent : function() {
-        $(this.el).append('<div class="row"><div class="span16">parent goes here<ul id="parent"</ul></div></div>');
-        var parentElement = $('#parent');
+        var element = this.el;
         getItem(this.model.get("parent"), function(parentModel) {
-            var model = new kw.Models.Item(parentModel);
-            var parentView = new kw.Views.itemSummaryView({ model : model });
-            parentElement.append(parentView.render().el);
+            if (parentModel.content.length > 0) {
+                $(element).append('<hr/><ul id="parent"></ul>');
+                var parentElement = $('#parent');
+                var model = new kw.Models.Item(parentModel);
+                var parentView = new kw.Views.itemSummaryView({ model : model });
+                parentElement.append(parentView.render().el);
+            }
         });
     },
     render : function() {
@@ -250,7 +251,10 @@ kw.Views.itemDetailView = Backbone.View.extend({
             this.renderParent();
         }
 
-        $(this.el).append('<div class="row"><div class="span1"></div><div id="detail" class="span15">detail goes here</div></div>');
+        var html = '<hr/><ul><li><pre class="detail">';
+        html += this.model.get("content");
+        html += '</pre></li></ul>';
+        $(this.el).append(html);
 
         var newItemView = new kw.Views.newItemView;
         newItemView.setParent(this, this.model.get("id"));
@@ -278,9 +282,17 @@ kw.Views.itemSummaryView = Backbone.View.extend({
         }
 
         var jsonModel = this.model.toJSON();
+
+        if (jsonModel.content.length > 32) {
+            jsonModel.contentSummary = jsonModel.content.substr(0, 32);
+            jsonModel.contentSummary += "...";
+        } else {
+            jsonModel.contentSummary = jsonModel.content;
+        }
+
         var template = this.template(jsonModel);
         $(this.el).html(template);
-        $(this.el).twipsy({ animate: false, delayIn : 500, fallback : 'Double-click for detail view', placement : 'below', title : function() { return 'Double-click for detail view'; } });
+//        $(this.el).twipsy({ animate: false, delayIn : 500, fallback : 'Double-click for detail view', placement : 'below', title : function() { return 'Double-click for detail view'; } });
         return this;
     }
 });

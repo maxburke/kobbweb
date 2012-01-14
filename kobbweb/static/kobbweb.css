@@ -86,3 +86,12 @@ body {
 .hidden {
     display: none;
 }
+
+li {
+    list-style-type : none;
+}
+
+.detail {
+    text-color: black;
+    background-color: #FFF3C9;
+}
