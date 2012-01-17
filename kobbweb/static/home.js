@@ -195,7 +195,7 @@ kw.Views.newItemView = Backbone.View.extend({
 kw.Views.itemDetailView = Backbone.View.extend({
     el : '#app',
     initialize : function(model) {
-        _.bindAll(this, 'close', 'render', 'addNewChild');
+        _.bindAll(this, 'close', 'render', 'addNewChild', 'renderChildren', 'renderParent', 'renderNav');
 
         this.model = model;
         this.parentUuid = model.get("parent");
@@ -236,22 +236,34 @@ kw.Views.itemDetailView = Backbone.View.extend({
     },
     renderParent : function() {
         var element = this.el;
+        $(element).append('<div id="parent"><hr/><ul></ul></div>');
         getItem(this.model.get("parent"), function(parentModel) {
             if (parentModel.content.length > 0) {
-                $(element).append('<hr/><ul id="parent"></ul>');
-                var parentElement = $('#parent');
+                var parentElement = $('#parent > ul');
                 var model = new kw.Models.Item(parentModel);
                 var parentView = new kw.Views.itemSummaryView({ model : model });
                 parentElement.append(parentView.render().el);
+            } else {
+                $('#parent').remove();
             }
         });
+    },
+    renderNav : function() {
+        var html = '<ul>';
+        html += '<li class="itemAction"><img src="/static/icons/at_20x20.png"></li>';
+        html += '<li class="itemAction"><img src="/static/icons/links_20x20.png"></li>';
+        html += '<li class="itemAction"><img src="/static/icons/acl_20x20.png"></li>';
+        html += '</ul>';
+        return html;
     },
     render : function() {
         if (this.model.get("parent") !== NULL_ID) {
             this.renderParent();
         }
 
-        var html = '<hr/><ul><li><pre class="detail">';
+        var html = '<hr/>';
+        html += this.renderNav();
+        html += '<ul><li><pre class="detail">';
         html += this.model.get("content");
         html += '</pre></li></ul>';
         $(this.el).append(html);

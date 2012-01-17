@@ -95,3 +95,9 @@ li {
     text-color: black;
     background-color: #FFF3C9;
 }
+
+.itemAction {
+    display : inline;
+    list-style-type: none;
+    padding-right: 10px;
+}
