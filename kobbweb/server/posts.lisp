@@ -1,7 +1,7 @@
 (in-package :kobbweb)
 
 (defprepared select-most-recent
- (:limit (:order-by (:select 'item_id :from 'posts) 'post_id) '$1 '$2))
+ (:limit (:order-by (:select 'item_id :from 'posts) (:desc 'post_id)) '$1 '$2))
 
 (defun posts-fetch (user-id)
  (with-connection *db-connection-parameters*
