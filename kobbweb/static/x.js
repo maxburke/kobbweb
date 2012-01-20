@@ -216,12 +216,31 @@ kw.Views.itemDetailView = Backbone.View.extend({
             }
         });
     },
+    renderAclModal : function() {
+        var html = '<div id="acl" class="modal hide fade" style="display: none">';
+        html += '<div class="modal-header"><a href="#" class="close">&times;</a>Access</div>';
+        html += '<div class="modal-body">Placeholder...</div>';
+        html += '<div class="modal-footer">Footer placeholder...</div>';
+        html += '</div>';
+        return html; 
+    },
+    renderAliasModal : function() {
+        var html = '<div id="alias" class="modal hide fade" style="display: none">';
+        html += '<div class="modal-header"><a href="#" class="close">&times;</a>Email Alias</div>';
+        html += '<div class="modal-body"><input id="alias-input" class="xlarge" value="' + this.model.get("id") + '"/>@kobbweb.net</div>';
+        html += '<div class="modal-footer"><button type="button" class="btn">Cancel</button><button type="button" class="btn primary">OK</button></div>';
+        html += '</div>';
+        return html;
+    },
     renderNav : function() {
         var html = '<ul>';
-        html += '<li class="itemAction"><img src="/static/icons/at_20x20.png"></li>';
-        html += '<li class="itemAction"><img src="/static/icons/links_20x20.png"></li>';
-        html += '<li class="itemAction"><img src="/static/icons/acl_20x20.png"></li>';
+        html += this.renderAliasModal();
+        html += this.renderAclModal();
+        html += '<li class="itemAction"><a data-controls-modal="alias" data-backdrop="true" data-keyboard="true"><img src="/static/icons/at_20x20.png"></a></li>';
+        html += '<li class="itemAction"><a data-controls-modal="links" data-backdrop="true" data-keyboard="true"><img src="/static/icons/links_20x20.png"></a></li>';
+        html += '<li class="itemAction"><a data-controls-modal="acl" data-backdrop="true" data-keyboard="true"><img src="/static/icons/acl_20x20.png"></a></li>';
         html += '</ul>';
+
         return html;
     },
     render : function() {
