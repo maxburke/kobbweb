@@ -7,6 +7,11 @@
 (defvar *null-digest*)
 (defvar *last-uuid* *null-uuid*)
 
+(defparameter +LIST-HIVE+ "lists")
+(defparameter +ACL-HIVE+ "acl_list")
+(defparameter +DATA-HIVE+ "data")
+
+
 (declaim (inline uuid=))
 (defun uuid= (uuid1 uuid2)
  (reduce (lambda (x y) (and x y)) (map 'vector #'= uuid1 uuid2))
@@ -135,13 +140,13 @@
 
 (defun acl-create-default (user-id)
  (let ((bytes (fixnum-to-word-bytes user-id)))
-  (cas-store bytes "acl_list")
+  (cas-store bytes +ACL-HIVE+)
  )
 )
 
 (defun acl-is-member-of (acl-id user-id)
  (let ((result))
-  (with-hex-named-file (:input nil nil "acl_list" acl-id file file-name)
+  (with-hex-named-file (:input nil nil +ACL-HIVE+ acl-id file file-name)
    (let ((scratch (make-array 4 :element-type '(unsigned-byte 8))))
     (labels ((recursive-acl-is-member-of (user-id file)
               (read-sequence scratch file)
@@ -158,11 +163,11 @@
 
 
 (defun data-load (content-ref)
- (cas-load content-ref "data")
+ (cas-load content-ref +DATA-HIVE+)
 )
 
 (defun data-store-octets (content)
- (cas-store content "data")
+ (cas-store content +DATA-HIVE+)
 )
 
 (defun data-store-string (string)
@@ -206,7 +211,7 @@
 
 (defun item-get-list-as-strings (item)
  (let ((children '())
-       (list-bytes (cas-load (item-list-ref item) "lists"))
+       (list-bytes (cas-load (item-list-ref item) +LIST-HIVE+))
        (item (make-array +uuid-size+ :element-type '(unsigned-byte 8))))
   (loop for i from 0 to (1- (length list-bytes)) by +uuid-size+
    do
@@ -223,19 +228,47 @@
  ;; be found then add it, in a loop, in case some other source is modifying
  ;; this same structure.
  (let* ((item (item-load item-uuid))
-        (list (cas-load (item-list-ref item) "lists"))
+        (list (cas-load (item-list-ref item) +LIST-HIVE+))
         (new-list (make-array (+ (length list) +uuid-size+) :element-type '(unsigned-byte 8)))
         (new-list-ref))
   (memcpy new-list child-uuid 0 0 +uuid-size+)
   (memcpy new-list list +uuid-size+ 0 (length list))
-  (setf new-list-ref (cas-store new-list "lists"))
+  (setf new-list-ref (cas-store new-list +LIST-HIVE+))
   (setf (item-list-ref item) new-list-ref)
   (item-store item)
  )
 )
 
-(with-sha1-digest (digest (make-array 0 :element-type '(unsigned-byte 8)))
- (setf *null-digest* digest)
+(defun item-remove-from-list (item-uuid child-uuid)
+ ;; As above, this function isn't atomic. Gonna have to work on that later.
+ ;; Perhaps use a proper schema-less database.
+ (let* ((item (item-load item-uuid))
+        (list (cas-load (item-list-ref item) +LIST-HIVE+))
+        (new-list (make-array (- (length list) +uuid-size+) :element-type '(unsigned-byte 8)))
+        (temp-list (make-array +uuid-size+ :element-type'(unsigned-byte 8)))
+        (dest-idx 0)
+        (list-length (length list))
+        (new-list-ref))
+  (loop for i from 0 to (1- list-length) by +uuid-size+
+   do
+   (memcpy temp-list list 0 i +uuid-size+)
+   (unless (uuid= temp-list child-uuid)
+           (progn (memcpy new-list list dest-idx i +uuid-size+)
+                  (setf dest-idx (+ dest-idx +uuid-size+))))
+  )
+  (setf new-list-ref (cas-store new-list +LIST-HIVE+))
+  (setf (item-list-ref item) new-list-ref)
+  (item-store item)
+ )
+)
+
+(let ((null-content (make-array 0 :element-type '(unsigned-byte 8))))
+ (with-sha1-digest (digest null-content)
+  (setf *null-digest* digest)
+  (cas-store null-content +LIST-HIVE+)
+  (cas-store null-content +ACL-HIVE+)
+  (cas-store null-content +DATA-HIVE+)
+ )
 )
 
 (defun item-create (user-id parent-uuid content-ref)

@@ -99,6 +99,15 @@
  )
 )
 
+(defun content-handle-delete (parent-uuid json-data)
+ (let* ((child (cdr (assoc :child json-data)))
+        (child-uuid (to-uuid child)))
+  (if (item-remove-from-list parent-uuid child-uuid)
+      *successful-post-response*
+      (setf (return-code*) +http-bad-request+))
+ )
+)
+
 (defun content-handler (uri)
  (let* ((req (request-method* *request*))
         (uuid-or-alias-string (cadr uri))
@@ -111,6 +120,7 @@
                             (json:decode-json-from-string raw-json-string))))
   (cond ((eq req :get) (content-handle-get uuid json-post-data))
         ((eq req :post) (content-handle-post uuid json-post-data))
+        ((eq req :delete) (content-handle-delete uuid json-post-data))
         (t (progn 
                  (setf (return-code*) +http-bad-request+)
                  "Bad request!"))

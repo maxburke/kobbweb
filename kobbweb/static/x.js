@@ -1,7 +1,3 @@
-var ITEM_SUMMARY_VIEW_TEMPLATE = '<div class="item-summary">'
-+ '<div><pre><%= contentSummary %></pre></div>'
-+ '</div>';
-
 var NULL_ID = "00000000000000000000000000000000";
 
 var kw = {
@@ -10,7 +6,6 @@ var kw = {
     Detail : { },
     Views : { },
     Collections : { },
-    Templates : { itemSummaryViewTemplate : ITEM_SUMMARY_VIEW_TEMPLATE },
     Data : { },
     ItemCache : { },
     ViewStack : null,
@@ -179,8 +174,8 @@ kw.Views.itemDetailView = Backbone.View.extend({
         modelData.idx = this.items.length;
         this.items.add(modelData);
         var parentElement = $('#children');
-        var view = new kw.Views.itemSummaryView({ model : this.items.at(modelData.idx) });
-        var child = view.render().el;
+        var view = new itemSummaryView({ model : this.items.at(modelData.idx) });
+        var child = view.render({ deletable : true }).el;
         parentElement.prepend(child);
     },
     renderChildren : function() {
@@ -196,8 +191,8 @@ kw.Views.itemDetailView = Backbone.View.extend({
             for (var i = 0; i < children.length; ++i) {
                 getItem(children[i], function(childModel) {
                     var model = new kw.Models.Item(childModel);
-                    var childView = new kw.Views.itemSummaryView({ model : model });
-                    childrenElement.append(childView.render().el);
+                    var childView = new itemSummaryView({ model : model });
+                    childrenElement.append(childView.render({ deletable : true }).el);
                 });
             }
         }
@@ -209,7 +204,7 @@ kw.Views.itemDetailView = Backbone.View.extend({
             if (parentModel.content.length > 0) {
                 var parentElement = $('#parent > ul');
                 var model = new kw.Models.Item(parentModel);
-                var parentView = new kw.Views.itemSummaryView({ model : model });
+                var parentView = new itemSummaryView({ model : model });
                 parentElement.append(parentView.render().el);
             } else {
                 $('#parent').remove();
@@ -262,35 +257,6 @@ kw.Views.itemDetailView = Backbone.View.extend({
 
         this.renderChildren();
 
-        return this;
-    }
-});
-
-kw.Views.itemSummaryView = Backbone.View.extend({
-    tagName : 'li',
-    template : _.template(kw.Templates.itemSummaryViewTemplate),
-    events : {
-        'dblclick .item-summary' : 'explodeItem'
-    },
-    explodeItem : function() {
-        window.location = "/x/" + this.model.get("id");
-    },
-    render : function () {
-        if (typeof this.model === 'undefined') {
-            alert("undefined");
-        }
-
-        var jsonModel = this.model.toJSON();
-
-        if (jsonModel.content.length > 32) {
-            jsonModel.contentSummary = jsonModel.content.substr(0, 32);
-            jsonModel.contentSummary += "...";
-        } else {
-            jsonModel.contentSummary = jsonModel.content;
-        }
-
-        var template = this.template(jsonModel);
-        $(this.el).html(template);
         return this;
     }
 });

@@ -1,7 +1,3 @@
-var ITEM_SUMMARY_VIEW_TEMPLATE = '<div class="item-summary">'
-+ '<div><pre><%= contentSummary %></pre></div>'
-+ '</div>';
-
 var NULL_ID = "00000000000000000000000000000000";
 
 var kw = {
@@ -10,7 +6,6 @@ var kw = {
     Detail : { },
     Views : { },
     Collections : { },
-    Templates : { itemSummaryViewTemplate : ITEM_SUMMARY_VIEW_TEMPLATE },
     Data : { },
     ItemCache : { },
     ViewStack : null,
@@ -162,35 +157,6 @@ kw.Views.newItemView = Backbone.View.extend({
     }
 });
 
-kw.Views.itemSummaryView = Backbone.View.extend({
-    tagName : 'li',
-    template : _.template(kw.Templates.itemSummaryViewTemplate),
-    events : {
-        'dblclick .item-summary' : 'explodeItem'
-    },
-    explodeItem : function() {
-        window.location = "/x/" + this.model.get("id");
-    },
-    render : function () {
-        if (typeof this.model === 'undefined') {
-            alert("undefined");
-        }
-
-        var jsonModel = this.model.toJSON();
-
-        if (jsonModel.content.length > 32) {
-            jsonModel.contentSummary = jsonModel.content.substr(0, 32);
-            jsonModel.contentSummary += "...";
-        } else {
-            jsonModel.contentSummary = jsonModel.content;
-        }
-
-        var template = this.template(jsonModel);
-        $(this.el).html(template);
-        return this;
-    }
-});
-
 kw.Views.AppView = Backbone.View.extend({
     el : '#app',
     initialize : function() {
@@ -222,7 +188,7 @@ kw.Views.AppView = Backbone.View.extend({
         var parentElement = $('#post-list');
 
         for (var i = 0; i < this.items.length; ++i) {
-            var view = new kw.Views.itemSummaryView({ model : this.items.at(i) });
+            var view = new itemSummaryView({ model : this.items.at(i) });
             var child = view.render().el;
             parentElement.append(child);
         }
@@ -247,6 +213,11 @@ kw.Views.AppView = Backbone.View.extend({
             + "are added to the right part of the array and, when sorted end up appearing at the top of the list.");
     },
     addEntries : function(itemList) {
+        if (itemList === null) {
+            this.render();
+            return;
+        }
+
         this.expectedNumModels = itemList.length;
         this.numModelsLoaded = 0;
         for (var i = 0; i < itemList.length; ++i) {
@@ -257,7 +228,7 @@ kw.Views.AppView = Backbone.View.extend({
         modelData.idx = this.items.length;
         this.items.add(modelData);
         var parentElement = $('#post-list');
-        var view = new kw.Views.itemSummaryView({ model : this.items.at(modelData.idx) });
+        var view = new itemSummaryView({ model : this.items.at(modelData.idx) });
         var child = view.render().el;
         parentElement.prepend(child);
     }
