@@ -35,54 +35,6 @@ body {
     border: 0;
 }
 
-.invite-email-input {
-    margin: 10px;
-}
-
-.invite-last-name-input {
-    margin: 10px;
-}
-
-.invite-first-name-input {
-    margin: 10px;
-}
-
-.log-location-input {
-    margin: 10px;
-}
-
-.invite-special-input {
-    width: 600px;
-    height: 54px;
-}
-
-#new-invite {
-    padding: 20px;
-}
-
-.invite-code {
-    font-size: 200%;
-    font-family: "Consolas", "Courier New", "monospace";
-}
-
-#invite-list .editing .display,
-#invite-list .edit {
-    display: none;
-}
-
-#invite-list .editing .edit {
-    display: block;
-}
-
-#rsvp .details,
-#rsvp .hidden {
-    display: none;
-}
-
-#rsvp .validated .details {
-    display: block;
-}
-
 .hidden {
     display: none;
 }
