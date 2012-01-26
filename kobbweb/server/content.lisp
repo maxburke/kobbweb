@@ -1,5 +1,6 @@
 (in-package :kobbweb)
 
+; Returns t if the char c is in the range [0..9] or [a..f]
 (declaim (inline is-hex-char) (optimize (debug 0) (speed 3) (safety 0)))
 (defun is-hex-char (c)
  (declare (type character c))
@@ -9,6 +10,9 @@
  )
 )
 
+; Returns true if the provided string only contains hex chars. This
+; is used to determine if a string is either a uuid or an alias. 
+; Hex strings 32-chars long are uuids, all else are treated as aliases.
 (declaim (inline contains-only-hex-chars))
 (defun contains-only-hex-chars (string)
  (declare (type simple-string string))
@@ -23,6 +27,8 @@
   (recursive-contains-only-hex-chars string 0 (length string)))
 )
 
+; Given a string that could either be an alias or uuid, return the uuid
+; it resolves to, or nil if it's an invalid uuid/alias.
 (defun to-uuid (uuid-or-alias)
  (declare (type simple-string uuid-or-alias))
  (if (and (= (length uuid-or-alias) 32)
@@ -45,6 +51,7 @@
  )
 )
 
+; Create a JSON representation of the provided item structure.
 (defun create-json-item (item)
  (let ((json-assoc '()))
   (push '(:success . "true") json-assoc)
@@ -56,6 +63,9 @@
  )
 )
 
+; GET /content/<uuid> returns the item with the given uuid. In this case
+; uuid is a byte vector, already resolved by to-uuid, and converted. It
+; is expected that the json post body here is null.
 (defun content-handle-get (uuid json-data)
  (assert (null json-data))
  (let ((item (item-load uuid))
@@ -79,11 +89,18 @@
  )
 )
 
+; Note in the database that a new post has been made.
 (defun content-record-new-post (user-id item)
  (with-connection *db-connection-parameters*
   (execute (:insert-into 'posts :set 'user_id user-id 'item_id (byte-vector-to-hex-string (item-uuid item)))))
 )
 
+; POST to /content/uuid creates a new item with the item represented by uuid
+; as its parent. This expects a JSON object with the member data : "<data>" at
+; a minimum. This can also have a member email : "foo@bar.com" which is used
+; by the email posting system as cookies/session data is not available. This
+; returns a JSON representation of the item structure which is fed back to the
+; client.
 (defun content-handle-post (uuid json-data)
  (assert (not (null json-data)))
  (let* ((user-id (content-get-user-id json-data))
@@ -94,6 +111,10 @@
  )
 )
 
+; DELETE to /content/parentuuid requires a JSON structure with member 
+; child : "<childuuid>" and de-links child from parent. The item isn't
+; removed from the system as it may have been linked to other parent
+; items.
 (defun content-handle-delete (parent-uuid json-data)
  (let* ((child (cdr (assoc :child json-data)))
         (child-uuid (to-uuid child)))

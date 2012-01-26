@@ -1,5 +1,8 @@
 (in-package :kobbweb)
 
+; As the basis of this primitive CAS this macro opens a file in the given direction
+; with the provided name. This takes care of the conversion of the byte vector to
+; name string, opening the file, and closing the file after it is finished.
 (defmacro with-hex-named-file ((direction does-not-exist exists root name-buffer stream file-path-var) &body body)
  (let ((file-name-var (gensym)))
   `(let* ((,file-name-var (byte-vector-to-hex-string ,name-buffer))
@@ -16,6 +19,8 @@
  )
 )
 
+; Creates a SHA1 digest, digest, from the given byte vector buffer and executes
+; the provided body.
 (defmacro with-sha1-digest ((digest buffer) &body body)
  (let ((digester-var (gensym)))
   `(let ((,digester-var (ironclad:make-digest :sha1)))
@@ -27,6 +32,8 @@
  )
 )
 
+; Load the data associated with content-ref from the specified hive, or returns
+; nil if the ref is invalid.
 (defun cas-load (content-ref hive)
  (let ((content))
   (with-hex-named-file (:input nil nil hive content-ref file file-name)
@@ -41,6 +48,8 @@
  )
 )
 
+; Store the given content, provided as a byte vector, in the given hive. Returns
+; the SHA1 digest of the content.
 (defun cas-store (content hive)
  (let ((content-ref))
   (with-sha1-digest (digest content)

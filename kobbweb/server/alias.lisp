@@ -1,5 +1,7 @@
 (in-package :kobbweb)
 
+; Given a user id and an alias, return the associated item uuid, or nil
+; if one does not exist.
 (defun alias-resolve-uuid (user-id alias)
  (with-connection *db-connection-parameters*
   (let* ((rows (query (:select 'item_id :from 'aliases
@@ -11,6 +13,8 @@
  )
 )
 
+; Analagous to the above, given a user id and a uuid in hex-string form,
+; return the associated item alias, or nil if one does not exist.
 (defun alias-resolve-alias (user-id uuid)
  (with-connection *db-connection-parameters*
   (let* ((rows (query (:select 'alias :from 'aliases
@@ -22,6 +26,8 @@
  )
 )
 
+; This function either creates a new alias, if one does not yet exist,
+; or replaces an existing one with the alias provided.
 (defun alias-set (user-id uuid alias)
  (with-connection *db-connection-parameters*
   (if (null (alias-resolve-alias user-id uuid))
@@ -47,6 +53,7 @@
  )
 )
 
+; GET /alias/<uuid> returns a JSON object { "alias" : "<alias string>" }
 (defun alias-handle-get (uuid-string)
  (with-connection *db-connection-parameters*
   (let* ((user-id (session-value 'id *session*))
@@ -60,6 +67,9 @@
  )
 )
 
+; POST to /alias/uuid of a json object { "alias" : "<alias string>" } either
+; creates a new alias if one does not yet exist or updates an existing one
+; for the associated user and item.
 (defun alias-handle-post (uuid-or-alias-string)
  (let* ((user-id (session-value 'id *session*))
         (raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8))
