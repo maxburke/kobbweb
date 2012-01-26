@@ -37,5 +37,5 @@
 ; text.
 (nconc *approved-return-codes* (list +http-not-found+ +http-forbidden+ +http-bad-request+))
 
-(defvar *successful-post-response* (json:encode-json-to-string '((:success . t))))
+(defvar *successful-post-response* (json:encode-json-to-string '((:success . "true"))))
 
