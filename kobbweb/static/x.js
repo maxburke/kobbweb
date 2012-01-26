@@ -19,6 +19,31 @@ memoizeData = function(ref, data) {
     DataCache[ref] = data;
 }
 
+post = function(url, returnType, data, onSuccess, onError) {
+    var postObject = {
+        url : url,
+        type : 'POST',
+        data : data,
+        dataType : returnType, 
+        processData : false,
+        success : onSuccess,
+        error : onError
+    };
+    $.ajax(postObject);
+}
+
+getJson = function(url, onSuccess, onError) {
+    var get = { 
+        url : url,
+        type : 'GET',
+        dataType : 'json',
+        processData : false,
+        success : onSuccess,
+        error : onError
+    };
+    $.ajax(get);
+}
+
 getData = function(ref, callback) {
     if (typeof DataCache[ref] === 'undefined') {
         var dataRequest = {
@@ -125,42 +150,29 @@ kw.Views.newItemView = Backbone.View.extend({
             data : requestText
         });
         var parentUuid = this.parentUuid;
-        var dataPost = {
-            url : '/data',
-            type : 'POST',
-            text : 'json',
-            data : dataSubmitData,
-            processData : false,
-            success : function (data, textStatus, jqXHR) {
-                var contentSubmitData = JSON.stringify({
-                    data : data,
-                });
+        post('/data', 'text', dataSubmitData, function(data, textStatus, jqXHR) {
+                var contentSubmitData = JSON.stringify({ data : data });
                 memoizeData(data, requestText);
-                var contentPost = {
-                    url : '/content/' + parentUuid,
-                    type : 'POST',
-                    dataType : 'json',
-                    data : contentSubmitData,
-                    processData : false,
-                    success : function(returnedData, textStatus, jqXHR) {
-                        returnedData.content = requestText;
-                        submitSuccess(returnedData);
-                    }
-                };
-                $.ajax(contentPost);
-            }
-        };
-        $.ajax(dataPost);
-        // submit item
-        // send message to parentView to add new child to its collection.
-        // I need to better think of the data + data flows here methinks.???
+                post('/content/' + parentUuid, 'json', contentSubmitData, function(returnedData, textStatus, jqXHR) {
+                    returnedData.content = requestText;
+                    submitSuccess(returnedData);
+                    });
+                });
     }
 });
 
 kw.Views.itemDetailView = Backbone.View.extend({
     el : '#app',
     initialize : function(model) {
-        _.bindAll(this, 'close', 'render', 'addNewChild', 'renderChildren', 'renderParent', 'renderNav');
+        _.bindAll(this, 
+            'close', 
+            'render',
+            'addNewChild',
+            'renderChildren',
+            'renderParent',
+            'renderNav', 
+            'aliasSubmit',
+            'issueAsyncDataFetches');
 
         this.model = model;
         this.parentUuid = model.get("parent");
@@ -222,8 +234,8 @@ kw.Views.itemDetailView = Backbone.View.extend({
     renderAliasModal : function() {
         var html = '<div id="alias" class="modal hide fade" style="display: none">';
         html += '<div class="modal-header"><a href="#" class="close">&times;</a>Email Alias</div>';
-        html += '<div class="modal-body"><input id="alias-input" class="xlarge" value="' + this.model.get("id") + '"/>@kobbweb.net</div>';
-        html += '<div class="modal-footer"><button type="button" class="btn">Cancel</button><button type="button" class="btn primary">OK</button></div>';
+        html += '<div class="modal-body"><input id="alias-input" class="xlarge" placeholder="fetching...""/>@kobbweb.net</div>';
+        html += '<div class="modal-footer"><button type="button" class="btn primary" id="alias-submit">Submit</button></div>';
         html += '</div>';
         return html;
     },
@@ -237,6 +249,29 @@ kw.Views.itemDetailView = Backbone.View.extend({
         html += '</ul>';
 
         return html;
+    },
+    aliasSubmit : function() {
+        var data = JSON.stringify({ alias : $('#alias-input').val()});
+        var modalInput = this.$('#alias-submit');
+        modalInput.attr('disabled', true);
+        var modalElement = $('#alias');
+        post('/alias/' + this.model.get("id"),
+            'json',
+            data,
+            function(data, textStatus, jqXHR) {
+                modalInput.removeAttr('disabled');
+                modalElement.modal('hide');
+            },
+            function(jqXHR, textStatus, errorThrown) {
+                modalInput.removeAttr('disabled');
+            });
+    },
+    issueAsyncDataFetches : function() {
+        var aliasElement = this.$('#alias-input');
+        this.$('#alias-submit').click(this.aliasSubmit);
+        getJson('/alias/' + this.model.get("id"), function(data, textStatus, jqXHR) {
+            aliasElement.val(data.alias);
+            });
     },
     render : function() {
         if (this.model.get("parent") !== NULL_ID) {
@@ -254,6 +289,9 @@ kw.Views.itemDetailView = Backbone.View.extend({
         newItemView.setParent(this, this.model.get("id"));
         var html = newItemView.render().el;
         $(this.el).append(html);
+
+        // Issue fetches for data after our code has been inserted into the DOM.
+        this.issueAsyncDataFetches();
 
         this.renderChildren();
 

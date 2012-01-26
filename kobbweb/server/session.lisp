@@ -4,7 +4,6 @@
  (json:encode-json-to-string `((:success . "false") (:reason . ,reason)))
 )
 
-(defvar *successful-login-response* (json:encode-json-to-string '((:success . "true"))))
 (defvar *invalid-password-response* (create-failure-response "I don't think that's your password!"))
 
 (defprepared valid-password-for-p
@@ -67,13 +66,13 @@
 
 (defun login-handle-post ()
  (if *session*
-  *successful-login-response*
+  *successful-post-response*
   (with-valid-login-data (email password password-verify)
    (let ((join-failure-cause (establish-join-failure-cause email password password-verify)))
     (if (eq join-failure-cause 'success)
      (progn (create-new-user email password)
             (login-and-start-session email)
-            *successful-login-response*)
+            *successful-post-response*)
      (progn (setf (return-code*) +http-bad-request+)
             (prepare-failure-response join-failure-cause))
     )
@@ -84,12 +83,12 @@
 
 (defun login-handle-put ()
  (if *session*
-  *successful-login-response*
+  *successful-post-response*
   (with-connection *db-connection-parameters*
    (with-valid-login-data (email password password-verify)
     (if (valid-password-for-p email password)
      (progn (login-and-start-session email)
-            *successful-login-response*)
+            *successful-post-response*)
      (progn (setf (return-code*) +http-forbidden+)
             *invalid-password-response*)
     )
@@ -102,7 +101,7 @@
  (if *session*
   (progn (delete-session-value 'id)
          (remove-session *session*)
-         *successful-login-response*
+         *successful-post-response*
   )
   (progn (setf (return-code*) +http-bad-request+)
          (create-failure-response "I don't think you're logged in!"))

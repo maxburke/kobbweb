@@ -23,16 +23,12 @@
   (recursive-contains-only-hex-chars string 0 (length string)))
 )
 
-(defun resolve-alias (alias)
- (assert nil)
-)
-
 (defun to-uuid (uuid-or-alias)
  (declare (type simple-string uuid-or-alias))
  (if (and (= (length uuid-or-alias) 32)
           (contains-only-hex-chars uuid-or-alias))
   (hex-string-to-byte-vector uuid-or-alias)
-  (resolve-alias uuid-or-alias)
+  (alias-resolve-uuid uuid-or-alias)
  )
 )
 
@@ -88,7 +84,6 @@
   (execute (:insert-into 'posts :set 'user_id user-id 'item_id (byte-vector-to-hex-string (item-uuid item)))))
 )
 
-(defvar *successful-post-response* (json:encode-json-to-string '((:success . "true"))))
 (defun content-handle-post (uuid json-data)
  (assert (not (null json-data)))
  (let* ((user-id (content-get-user-id json-data))

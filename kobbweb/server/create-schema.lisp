@@ -17,6 +17,14 @@
      (user_id :type integer)
      (item_id :type string))
    )
+  )
+  (execute
+   (:create-table aliases
+    ((user_id :type integer :primary-key t)
+     (item_id :type string)
+     (alias :type string))
+   )
+  )
 ;   (:create-table locations
 ;    ((location_id :type serial :primary-key t)
 ;     (name :type text)
@@ -38,7 +46,6 @@
 ;     (partner :type integer :references (users :no-action :no-action))
 ;     (notes :type text))
 ;   )
-  )
  )
 )
 

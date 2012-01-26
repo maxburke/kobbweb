@@ -15,8 +15,8 @@
 
 ; These three should be *off* for release.
 (setf *show-lisp-errors-p* t)
-(setf *message-log-pathname* #p"/home/max/src/lisp/kobbweb/logs/message.log")
-(setf *access-log-pathname* #p"/home/max/src/lisp/kobbweb/logs/access.log")
+(setf *message-log-pathname* #p"/Users/max/src/lisp/kobbweb/logs/message.log")
+(setf *access-log-pathname* #p"/Users/max/src/lisp/kobbweb/logs/access.log")
 (defvar *kobbweb-debug* t)
 
 (if *kobbweb-debug*
@@ -36,3 +36,6 @@
 ; a "not found" status code if certain records aren't found, without sending back error
 ; text.
 (nconc *approved-return-codes* (list +http-not-found+ +http-forbidden+ +http-bad-request+))
+
+(defvar *successful-post-response* (json:encode-json-to-string '((:success . t))))
+

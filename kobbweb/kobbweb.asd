@@ -19,6 +19,7 @@
        (:file "bad-passwords")
        (:file "init")
        (:file "create-schema")
+       (:file "alias")
        (:file "cas")
        (:file "item")
        (:file "content")
