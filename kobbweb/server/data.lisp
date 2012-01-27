@@ -1,5 +1,6 @@
 (in-package :kobbweb)
 
+; GET /data/<ref> returns the raw data at that endpoint.
 (defun data-handle-get (ref)
  (if (null ref)
   (setf (return-code*) +http-not-found+)
@@ -12,6 +13,8 @@
  )
 )
 
+; POST to /data will create a CAS-entry with the post body and return to the caller
+; the 40-character stringized SHA1 hash of the content.
 (defun data-handle-post ()
  (let* ((raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8))
         (json (if (or (null raw-json-string) (string= raw-json-string "")) 

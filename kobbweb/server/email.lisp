@@ -29,7 +29,17 @@
  )
 )
 
-
+; The email client only handles POST methods to /email. The request
+; must consist of a JSON object with the following schema:
+; "to" : "<uuid-or-alias@kobbweb.net>"
+;   * this field must be either a valid alias or a valid uuid
+; "from" : "<users-email-address>"
+;   * the users email address here must be a valid Kobbweb user and
+;     they must have permissions to access the item identified by the
+;     uuid/alias above.
+; "data" : "<body of email message>"
+;   * this contains the raw body of the email. No assumptions are made
+;     about the content of this field, other than it must be a string.
 (defun email-handler ()
  (let ((req (request-method* *request*)))
   (if (eq req :post)

@@ -11,12 +11,16 @@
 (defparameter +ACL-HIVE+ "acl_list")
 (defparameter +DATA-HIVE+ "data")
 
-
+; uuid= compares two byte vectors for value equality. There is no requirement
+; on the input data other than they must be byte vectors.
 (declaim (inline uuid=))
 (defun uuid= (uuid1 uuid2)
  (reduce (lambda (x y) (and x y)) (map 'vector #'= uuid1 uuid2))
 )
 
+; byte-vector-to-hex-string converts a byte vector (ie: #(192 168 1 105)) to
+; a string form (ie: "c0a80169") and is used for presenting a uuid or CAS ref
+; in a human-readable form for transmission to clients.
 (defvar *hex-chars* "0123456789abcdef")
 (defun byte-vector-to-hex-string (byte-vector)
  (let ((output (make-array (* 2 (length byte-vector)) :element-type 'character))
@@ -34,6 +38,7 @@
  )
 )
 
+; The inverse operation to the above function (ie, "c0a80169" -> #(192 168 1 105))
 (defun hex-string-to-byte-vector (string)
  (let* ((string-length (length string))
         (output (make-array (ash string-length -1) :element-type '(unsigned-byte 8))))
@@ -50,6 +55,8 @@
  )
 )
 
+; Create a new UUID which is used for identifying items in a machine-independent
+; manner.
 (defun uuid-next ()
  (let ((uuid))
   (sb-thread:with-mutex (*uuid-lock*)
@@ -65,6 +72,7 @@
  )
 )
 
+; Break down a fixnum into a 4-byte vector
 (defun fixnum-to-word-bytes (num)
  (declare (type fixnum num))
  (let ((seq (make-array 4 :element-type '(unsigned-byte 8))))
@@ -75,7 +83,9 @@
   seq)
 )
 
+; Convert a 4-byte vector into a fixnum
 (defun word-bytes-to-fixnum (bytes)
+ (assert (= (length bytes) 4))
  (logior (aref bytes 0) 
          (ash (aref bytes 1) 8)
          (ash (aref bytes 2) 16)
@@ -86,6 +96,7 @@
 (defconstant +uuid-size+ 16)
 (defconstant +sha1-size+ 20)
 
+; Item data structure declaration.
 (declaim (inline make-item))
 (defstruct item
  (schema-version 1 :type fixnum)
@@ -97,6 +108,9 @@
  (user-id 0 :type fixnum)
 )
 
+; Writes an item structure to a (file) stream. Only the intger schema
+; version numbers and user IDs require conversion, all the other byte
+; fields serialize easy.
 (defun item-write-to-stream (item stream)
  (let ((raw-user-id (fixnum-to-word-bytes (item-user-id item)))
        (raw-schema-id (fixnum-to-word-bytes (item-schema-version item))))
@@ -109,6 +123,7 @@
  )
 )
 
+; Re-materializes an item from a (file) stream.
 (defun item-read-from-stream (uuid stream)
  (if (not (null stream))
      (let ((item (make-item))
@@ -138,12 +153,15 @@
  )
 )
 
+; Typically items are created with a default ACL containing only the 
+; posting user's ID number. This function creates that ACL.
 (defun acl-create-default (user-id)
  (let ((bytes (fixnum-to-word-bytes user-id)))
   (cas-store bytes +ACL-HIVE+)
  )
 )
 
+; Tests to see if the given user ID is a member of a particular ACL.
 (defun acl-is-member-of (acl-id user-id)
  (let ((result))
   (with-hex-named-file (:input nil nil +ACL-HIVE+ acl-id file file-name)
@@ -161,15 +179,17 @@
  )
 )
 
-
+; Load data from the "data" hive.
 (defun data-load (content-ref)
  (cas-load content-ref +DATA-HIVE+)
 )
 
+; Store raw bytes to the "data" hive.
 (defun data-store-octets (content)
  (cas-store content +DATA-HIVE+)
 )
 
+; Convenience function to store a string to the "data" hive.
 (defun data-store-string (string)
  (let ((octets (flexi-streams:string-to-octets string)))
   (data-store-octets octets)
@@ -191,6 +211,8 @@
  )
 )
 
+; Fetch the ACL from a parent element which is used for inheriting
+; access refs when creating child elements.
 (defun item-get-acl-from-parent (parent-uuid)
  (let ((item (item-load parent-uuid)))
   (if (not (null item))
@@ -209,6 +231,7 @@
  )
 )
 
+; Stringify the item list, for transmission to the web client.
 (defun item-get-list-as-strings (item)
  (let ((children '())
        (list-bytes (cas-load (item-list-ref item) +LIST-HIVE+))
@@ -221,7 +244,7 @@
   children
  )
 )
-
+; Adds child-uuid to item-uuid's item list.
 (defun item-add-to-list (item-uuid child-uuid)
  ;; TODO: This isn't entirely atomic and will need to be revisited later.
  ;; This function should check the list for the child uuid and if it can't
@@ -239,6 +262,7 @@
  )
 )
 
+; Removes child-uuid from item-uuid's item list, for when an item is to be deleted.
 (defun item-remove-from-list (item-uuid child-uuid)
  ;; As above, this function isn't atomic. Gonna have to work on that later.
  ;; Perhaps use a proper schema-less database.
@@ -262,6 +286,7 @@
  )
 )
 
+; Initialize the hives on program startup with default null (empty) values.
 (let ((null-content (make-array 0 :element-type '(unsigned-byte 8))))
  (with-sha1-digest (digest null-content)
   (setf *null-digest* digest)
@@ -271,6 +296,9 @@
  )
 )
 
+; Given a user-id, parent-uuid, and content ref, create an item structure
+; instance which is then returned. This function also adds the created 
+; item to the parent item's list.
 (defun item-create (user-id parent-uuid content-ref)
  (let ((acl-ref nil)
        (uuid (uuid-next)))

@@ -37,5 +37,9 @@
 ; text.
 (nconc *approved-return-codes* (list +http-not-found+ +http-forbidden+ +http-bad-request+))
 
+; *successful-post-response* is a generic JSON response for when something is returned to
+; a client. It is equivalent to { "success" : "true" }. "true"/"false" is currently used,
+; as opposed to the boolean true/false values, because cl-json cannot serialize false, 
+; only null.
 (defvar *successful-post-response* (json:encode-json-to-string '((:success . "true"))))
 
