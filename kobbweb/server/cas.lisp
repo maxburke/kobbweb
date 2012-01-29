@@ -19,7 +19,16 @@
   ; Since data is uniquely identified by its SHA1 hash a duplicate value 
   ; will have the same key as the pre-existing record. We can just ignore
   ; the errors the database gives us here regarding duplicate primary keys.
+  ;
+  ; This function can't be used for updating existing information though, 
+  ; that needs to be done with kv-update.
   (ignore-errors (execute (:insert-into hive :set 'key key 'value value)))
+ )
+)
+
+(defun kv-update (hive key value)
+ (with-connection *db-connection-parameters*
+  (ignore-errors (execute (:update hive :set 'value value :where (:= 'key key))))
  )
 )
 

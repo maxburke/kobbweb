@@ -196,12 +196,29 @@
  )
 )
 
+(defmacro with-item-byte-vector ((item output) &body body)
+ (let ((item-stream (gensym)))
+  `(let ((,item-stream (flexi-streams:make-in-memory-output-stream :element-type '(unsigned-byte 8)))
+         (,output))
+    (item-write-to-stream ,item ,item-stream)
+    (setf ,output (flexi-streams:get-output-stream-sequence ,item-stream))
+    ,@body
+   )
+ )
+)
+
+; item-store is only for creating new item objects -- it will not perform any action if there is
+; an object with that particular uuid in the data store. Updating item objects has to be done
+; with item-update below.
 (defun item-store (item)
- (let ((stream (flexi-streams:make-in-memory-output-stream :element-type '(unsigned-byte 8)))
-       (output))
-  (item-write-to-stream item stream)
-  (setf output (flexi-streams:get-output-stream-sequence stream))
+ (with-item-byte-vector (item output)
   (kv-store +ITEM-HIVE+ (item-uuid item) output)
+ )
+)
+
+(defun item-update (item)
+ (with-item-byte-vector (item output)
+  (kv-update +ITEM-HIVE+ (item-uuid item) output)
  )
 )
 
@@ -266,7 +283,7 @@
   (memcpy new-list list +uuid-size+ 0 (length list))
   (setf new-list-ref (cas-store new-list +LIST-HIVE+))
   (setf (item-list-ref item) new-list-ref)
-  (item-store item)
+  (item-update item)
  )
 )
 
@@ -290,7 +307,7 @@
   )
   (setf new-list-ref (cas-store new-list +LIST-HIVE+))
   (setf (item-list-ref item) new-list-ref)
-  (item-store item)
+  (item-update item)
  )
 )
 
