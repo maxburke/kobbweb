@@ -1,3 +1,4 @@
+<!doctype html>
 <html xmlns="http://www.w4.org/1999/xhtml">
     <head>
         <link href="/static/bootstrap.min.css" media="all" rel="stylesheet" type="text/css"/>
@@ -29,12 +30,23 @@
 
         <div class="container">
             <div class="content">
-                <div class="alert-message hidden" id="status"></div>
+                <div class="alert-message hidden" id="status">
+                </div>
                 <div class="row">
                     <div class="span7">
                         <center><img src="/static/icons/kobb_small.png"/></center>
                     </div>
                     <div class="span7">
+                    <h3>Welcome to kobbweb!</h3>
+                    Kobbweb is currently in closed beta, but if you're interested in playing around with our 
+                    information sharing service, do request an invite below!
+
+                    <div>
+                    <hr/>
+                        <input type="text" id="invitation" placeholder="email address"/>
+                        <button type="button" class="btn primary" id="invite-submit">Request Invitation</button>
+                    </div>
+                    <!--
                     <h3>Sign up!</h3>
                         <form id="join-form">
                             <fieldset>
@@ -64,6 +76,7 @@
                                 </div>
                             </fieldset>
                         </form>
+                    -->
                     </div>
                 </div>
             </div>
