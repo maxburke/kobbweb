@@ -25,6 +25,33 @@
      (alias :type string))
    )
   )
+
+  ;;;;;
+  ;;; Temporarily using Postgres as our key/value store, for easy hackability.
+  (execute
+   (:create-table lists
+    ((key :type :bytea :primary-key t)
+     (:value :type :bytea))
+   )
+  )
+  (execute
+   (:create-table acl
+    ((key :type :bytea :primary-key t)
+     (:value :type :bytea))
+   )
+  )
+  (execute
+   (:create-table data
+    ((key :type :bytea :primary-key t)
+     (:value :type :bytea))
+   )
+  )
+  (execute
+   (:create-table items
+    ((key :type :bytea :primary-key t)
+     (:value :type :bytea))
+   )
+  )
  )
 )
 

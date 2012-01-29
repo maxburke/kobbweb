@@ -7,9 +7,10 @@
 (defvar *null-digest*)
 (defvar *last-uuid* *null-uuid*)
 
-(defparameter +LIST-HIVE+ "lists")
-(defparameter +ACL-HIVE+ "acl_list")
-(defparameter +DATA-HIVE+ "data")
+(defparameter +LIST-HIVE+ 'lists)
+(defparameter +ACL-HIVE+ 'acl)
+(defparameter +DATA-HIVE+ 'data)
+(defparameter +ITEM-HIVE+ 'items)
 
 ; uuid= compares two byte vectors for value equality. There is no requirement
 ; on the input data other than they must be byte vectors.
@@ -108,7 +109,7 @@
  (user-id 0 :type fixnum)
 )
 
-; Writes an item structure to a (file) stream. Only the intger schema
+; Writes an item structure to a (file) stream. Only the integer schema
 ; version numbers and user IDs require conversion, all the other byte
 ; fields serialize easy.
 (defun item-write-to-stream (item stream)
@@ -163,17 +164,16 @@
 
 ; Tests to see if the given user ID is a member of a particular ACL.
 (defun acl-is-member-of (acl-id user-id)
- (let ((result))
-  (with-hex-named-file (:input nil nil +ACL-HIVE+ acl-id file file-name)
-   (let ((scratch (make-array 4 :element-type '(unsigned-byte 8))))
-    (labels ((recursive-acl-is-member-of (user-id file)
-              (read-sequence scratch file)
-              (if (= (word-bytes-to-fixnum scratch) user-id)
-                  t
-                  (recursive-acl-is-member-of user-id file))))
-     (setf result (recursive-acl-is-member-of user-id file))
-    )
-   )
+ (let* ((result)
+        (acl (cas-load acl-id +ACL-HIVE+))
+        (scratch (make-array 4 :element-type '(unsigned-byte 8)))
+        (stream (flexi-streams:make-in-memory-input-stream acl)))
+  (labels ((recursive-acl-is-member-of (user-id byte-stream)
+            (read-sequence scratch byte-stream)
+            (if (= (word-bytes-to-fixnum scratch) user-id)
+                t
+                (recursive-acl-is-member-of user-id byte-stream))))
+   (setf result (recursive-acl-is-member-of user-id stream))
   )
   result
  )
@@ -197,17 +197,25 @@
 )
 
 (defun item-store (item)
- (with-hex-named-file (:output :create :supersede "items" (item-uuid item) file file-name)
-  (item-write-to-stream item file)
+ (let ((stream (flexi-streams:make-in-memory-output-stream :element-type '(unsigned-byte 8)))
+       (output))
+  (item-write-to-stream item stream)
+  (setf output (flexi-streams:get-output-stream-sequence stream))
+  (kv-store +ITEM-HIVE+ (item-uuid item) output)
  )
 )
 
 (defun item-load (uuid)
- (let ((item))
-  (with-hex-named-file (:input nil nil "items" uuid file file-name)
-   (if (not (null file))
-       (setf item (item-read-from-stream uuid file))))
-  item
+ (with-connection *db-connection-parameters*
+  (let* ((data (kv-load +ITEM-HIVE+ uuid))
+         (stream (if (not (null data))
+                     (flexi-streams:make-in-memory-input-stream data)
+                     nil))
+         (item (if (not (null stream))
+                   (item-read-from-stream uuid stream)
+                   nil)))
+   item
+  )
  )
 )
 
