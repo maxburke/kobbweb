@@ -6,7 +6,7 @@
   (setf (return-code*) +http-not-found+)
   (let ((data (cas-load (hex-string-to-byte-vector ref) +DATA-HIVE+)))
    (if (null data)
-       (setf (return-code*) +http-not-found+)
+       (progn (setf (return-code*) +http-not-found+) "")
        data)
   )
  )
