@@ -47,9 +47,11 @@
    do
    (let* ((high-nybble (position (char string i) *hex-chars* :test #'equalp))
           (low-nybble (position (char string (1+ i)) *hex-chars* :test #'equalp))
-          (vector-index (ash i -1))
-          (byte (logior (ash (logand high-nybble 15) 4) (logand low-nybble 15))))
-    (setf (aref output vector-index) byte)
+          (vector-index (ash i -1)))
+    (when (or (null high-nybble) (null low-nybble))
+          (return-from hex-string-to-byte-vector nil))
+    (let ((byte (logior (ash (logand high-nybble 15) 4) (logand low-nybble 15))))
+     (setf (aref output vector-index) byte))
    )
   )
   output
