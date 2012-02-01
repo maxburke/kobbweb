@@ -2,6 +2,9 @@
 
 ; Like /home, /x is a static page and all the dynamic content is handled by JS.
 (defun x-handler ()
- (handle-static-file #p"static/x.html")
+ (if (null *session*)
+     (redirect "/")
+     (handle-static-file #p"static/x.html")
+ )
 )
 
