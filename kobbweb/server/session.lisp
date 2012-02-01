@@ -97,6 +97,17 @@
  )
 )
 
+(defun login-create-temporary-password (email)
+ (let* ((raw-password (format nil "~a~a" email (get-universal-time)))
+        (password-octets (flexi-streams:string-to-octets raw-password))
+        (password))
+  (with-sha1-digest (digest password-octets)
+   (setf password (cl-base64:usb8-array-to-base64-string digest))
+  )
+  password
+ )
+)
+
 (defun login-handle-delete ()
  (if *session*
   (progn (delete-session-value 'id)

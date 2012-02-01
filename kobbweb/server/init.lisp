@@ -37,6 +37,7 @@
  (setf *dispatch-table*
   (nconc (list 'dispatch-easy-handlers
           (create-folder-dispatcher-and-handler "/static/" #p"static/")
+          (create-prefix-dispatcher "/acl" (uri-dispatcher #'acl-handler))
           (create-prefix-dispatcher "/alias" (uri-dispatcher #'alias-handler))
           (create-prefix-dispatcher "/sessions" #'sessions-handler)
           (create-prefix-dispatcher "/content" (uri-dispatcher #'content-handler))

@@ -5,7 +5,7 @@
 
 (defsystem "kobbweb"
  :serial t
- :depends-on (:hunchentoot :cl-who :postmodern :cl-json :uuid :ironclad)
+ :depends-on (:hunchentoot :cl-who :postmodern :cl-json :uuid :ironclad :cl-smtp :cl-base64)
  :components (
    (:module :server
     :serial t
@@ -28,6 +28,7 @@
        (:file "data")
        (:file "posts")
        (:file "email")
+       (:file "acl")
        (:file "x")
       )
     )

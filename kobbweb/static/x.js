@@ -172,6 +172,7 @@ kw.Views.itemDetailView = Backbone.View.extend({
             'renderParent',
             'renderNav', 
             'aliasSubmit',
+            'aclAdd',
             'issueAsyncDataFetches');
 
         this.model = model;
@@ -226,8 +227,8 @@ kw.Views.itemDetailView = Backbone.View.extend({
     renderAclModal : function() {
         var html = '<div id="acl" class="modal hide fade" style="display: none">';
         html += '<div class="modal-header"><a href="#" class="close">&times;</a>Access</div>';
-        html += '<div class="modal-body">Placeholder...</div>';
-        html += '<div class="modal-footer">Footer placeholder...</div>';
+        html += '<div class="modal-body">Add a person to share this post with!<div><input type="text" class="xlarge" placeholder="email address" id="acl-email"/>&nbsp;<button type="button" class="btn primary" id="acl-add">Add!</button></div><div id="acl-status"></div></div>';
+        html += '<div class="modal-footer"></div>';
         html += '</div>';
         return html; 
     },
@@ -244,7 +245,6 @@ kw.Views.itemDetailView = Backbone.View.extend({
         html += this.renderAliasModal();
         html += this.renderAclModal();
         html += '<li class="itemAction"><a data-controls-modal="alias" data-backdrop="true" data-keyboard="true"><img src="/static/icons/at_20x20.png"></a></li>';
-        html += '<li class="itemAction"><a data-controls-modal="links" data-backdrop="true" data-keyboard="true"><img src="/static/icons/links_20x20.png"></a></li>';
         html += '<li class="itemAction"><a data-controls-modal="acl" data-backdrop="true" data-keyboard="true"><img src="/static/icons/acl_20x20.png"></a></li>';
         html += '</ul>';
 
@@ -266,9 +266,27 @@ kw.Views.itemDetailView = Backbone.View.extend({
                 modalInput.removeAttr('disabled');
             });
     },
+    aclAdd : function() {
+        $('#acl-status').hide();
+        var email = $('#acl-email').val();
+        var addElement = $('#acl-add');
+        if (email.indexOf('@') === -1) {
+            $('#acl-status').text('Invalid email address!').show().addClass("error");
+        } else {
+            var data = JSON.stringify({ email : email });
+            addElement.attr('disabled', true);
+            post('/acl/' + this.model.get("id"),
+                 'json',
+                 data,
+                 function(data, textStatus, jqXHR) {
+                    addElement.removeAttr('disabled');
+                 });
+        }
+    },
     issueAsyncDataFetches : function() {
         var aliasElement = this.$('#alias-input');
         this.$('#alias-submit').click(this.aliasSubmit);
+        this.$('#acl-add').click(this.aclAdd);
         getJson('/alias/' + this.model.get("id"), function(data, textStatus, jqXHR) {
             aliasElement.val(data.alias);
             });

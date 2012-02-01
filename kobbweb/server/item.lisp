@@ -156,31 +156,6 @@
  )
 )
 
-; Typically items are created with a default ACL containing only the 
-; posting user's ID number. This function creates that ACL.
-(defun acl-create-default (user-id)
- (let ((bytes (fixnum-to-word-bytes user-id)))
-  (cas-store bytes +ACL-HIVE+)
- )
-)
-
-; Tests to see if the given user ID is a member of a particular ACL.
-(defun acl-is-member-of (acl-id user-id)
- (let* ((result)
-        (acl (cas-load acl-id +ACL-HIVE+))
-        (scratch (make-array 4 :element-type '(unsigned-byte 8)))
-        (stream (flexi-streams:make-in-memory-input-stream acl)))
-  (labels ((recursive-acl-is-member-of (user-id byte-stream)
-            (read-sequence scratch byte-stream)
-            (if (= (word-bytes-to-fixnum scratch) user-id)
-                t
-                (recursive-acl-is-member-of user-id byte-stream))))
-   (setf result (recursive-acl-is-member-of user-id stream))
-  )
-  result
- )
-)
-
 ; Load data from the "data" hive.
 (defun data-load (content-ref)
  (cas-load content-ref +DATA-HIVE+)
