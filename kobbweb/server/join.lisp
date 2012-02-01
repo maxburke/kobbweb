@@ -34,29 +34,6 @@
 )
 
 ;;;
-(defun render-join-page (join-failure-cause)
- (with-html-output-to-string (html-stream)
-  (:html
-   (kobbweb-prologue html-stream "iRSVP - Join!")
-   (with-header-no-login (html-stream)
-    (report-failure-message html-stream join-failure-cause)
-    (:div :id "join-block"
-     (:form :action "/join" :method "post"
-      (:label :for "join-email" "email")
-      (:input :type "text" :name "email" :id "join-email" :value (default-email-text))
-      (:label :for "join-password" "password")
-      (:input :type "password" :name "password" :id "join-password")
-      (:label :for "join-password-verify" "verify password")
-      (:input :type "password" :name "password-verify" :id "join-password-verify")
-      (:input :type "submit" :value "join!" :id "join-submit")
-     )
-    )
-   )
-  )
- )
-)
-
-;;;
 (defprepared email-exists-p
  (:select 'email :from 'users :where (:= '$1 'email)))
 
@@ -77,26 +54,10 @@
 ;;;
 (defun create-new-user (email password)
  (with-connection *db-connection-parameters*
-  (execute (:insert-into 'users :set 'email email 'password (:crypt password (:gen_salt "bf")))))
-)
-
-;;;
-(defun join-handler ()
- (if *session* 
-  (redirect "/home"))
- (let* ((email (post-parameter "email"))
-        (password (post-parameter "password"))
-        (password-verify (post-parameter "password-verify"))
-        (join-failure-cause (establish-join-failure-cause email password password-verify))
-       )
-  (if (eq join-failure-cause 'success)
-   (progn 
-    (create-new-user email password)
-    (login-and-start-session email)
-    (redirect "/home")
-   )
-   (render-join-page join-failure-cause)
-  )
+  (execute (:insert-into 'users :set 'email email 'password (:crypt password (:gen_salt "bf"))))
+  (let* ((rows (query (:select 'user_id :from 'users :where (:= 'email email))))
+         (user-id (caar rows)))
+   user-id)
  )
 )
 
