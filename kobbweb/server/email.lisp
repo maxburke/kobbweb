@@ -1,8 +1,8 @@
 (in-package :kobbweb)
 
 (declaim (inline email-trim-and-resolve))
-(defun email-trim-and-resolve (str)
- (to-uuid (subseq str 0 (position #\@ str)))
+(defun email-trim-and-resolve (str user-id)
+ (to-uuid user-id (subseq str 0 (position #\@ str)))
 )
 
 (defun email-retrieve-user-id (email)
@@ -21,8 +21,8 @@
 )
 
 (defun email-handle-post ()
- (let* ((uuid (email-trim-and-resolve (post-parameter "to")))
-        (user-id (email-retrieve-user-id (post-parameter "from")))
+ (let* ((user-id (email-retrieve-user-id (post-parameter "from")))
+        (uuid (email-trim-and-resolve (post-parameter "to") user-id))
         (data (post-parameter "data")))
   (email-handle-insertion uuid user-id data)
   *successful-post-response*

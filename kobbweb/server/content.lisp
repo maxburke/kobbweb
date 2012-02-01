@@ -29,12 +29,14 @@
 
 ; Given a string that could either be an alias or uuid, return the uuid
 ; it resolves to, or nil if it's an invalid uuid/alias.
-(defun to-uuid (uuid-or-alias)
+(defun to-uuid (user-id uuid-or-alias)
  (declare (type simple-string uuid-or-alias))
- (if (and (= (length uuid-or-alias) 32)
-          (contains-only-hex-chars uuid-or-alias))
-  (hex-string-to-byte-vector uuid-or-alias)
-  (alias-resolve-uuid uuid-or-alias)
+ (hex-string-to-byte-vector 
+  (if (and (= (length uuid-or-alias) 32)
+           (contains-only-hex-chars uuid-or-alias))
+   uuid-or-alias
+   (alias-resolve-uuid user-id uuid-or-alias)
+  )
  )
 )
 
@@ -115,9 +117,9 @@
 ; child : "<childuuid>" and de-links child from parent. The item isn't
 ; removed from the system as it may have been linked to other parent
 ; items.
-(defun content-handle-delete (parent-uuid json-data)
+(defun content-handle-delete (parent-uuid json-data user-id)
  (let* ((child (cdr (assoc :child json-data)))
-        (child-uuid (to-uuid child)))
+        (child-uuid (to-uuid user-id child)))
   (if (item-remove-from-list parent-uuid child-uuid)
       *successful-post-response*
       (setf (return-code*) +http-bad-request+))
@@ -127,8 +129,9 @@
 (defun content-handler (uri)
  (let* ((req (request-method* *request*))
         (uuid-or-alias-string (cadr uri))
+        (user-id (session-value 'id *session*))
         (uuid (if (not (null uuid-or-alias-string))
-                  (to-uuid uuid-or-alias-string)
+                  (to-uuid user-id uuid-or-alias-string)
                   *null-uuid*))
         (raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8))
         (json-post-data (if (or (null raw-json-string) (string= raw-json-string "")) 
@@ -136,7 +139,7 @@
                             (json:decode-json-from-string raw-json-string))))
   (cond ((eq req :get) (content-handle-get uuid json-post-data))
         ((eq req :post) (content-handle-post uuid json-post-data))
-        ((eq req :delete) (content-handle-delete uuid json-post-data))
+        ((eq req :delete) (content-handle-delete uuid json-post-data user-id))
         (t (progn 
                  (setf (return-code*) +http-bad-request+)
                  "Bad request!"))
