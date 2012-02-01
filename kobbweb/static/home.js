@@ -41,7 +41,7 @@ memoizeItem = function(item) {
     ItemCache[item.id] = item;
 }
 
-getItem = function(uuid, callback) {
+getItem = function(uuid, successCallback, errorCallback) {
     if (typeof ItemCache[uuid] === 'undefined') {
         var ajaxRequest = { 
             url : '/content/' + uuid,
@@ -53,9 +53,10 @@ getItem = function(uuid, callback) {
                     data.id = uuid;
                     data.content = dataResult;
                     ItemCache[uuid] = data;
-                    callback(data);
+                    successCallback(data);
                 });
-            }
+            },
+            error : errorCallback
         };
         $.ajax(ajaxRequest);
     } else {
@@ -201,11 +202,18 @@ kw.Views.AppView = Backbone.View.extend({
     fetchEntry : function(itemList, i) {
         var collection = this.items;
         var view = this;
-        getItem(itemList[i], function(data) {
-            data.idx = i;
-            collection.add(data);
-            view.modelLoadedCallback();
-        });
+        getItem(itemList[i], 
+            function(data) {
+                data.idx = i;
+                collection.add(data);
+                view.modelLoadedCallback();
+            },
+            function() {
+                // TODO: This needs to check the error code returned by
+                // the server. 403 is fine to ignore, others not so much
+                // (ie: 400, 500)
+                view.modelLoadedCallback();
+            });
     },
     addEntry : function(model) {
         alert("add an entry here. you might need to change the collection comparator here to sort in reverse order. "
