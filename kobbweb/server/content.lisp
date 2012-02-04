@@ -40,10 +40,10 @@
  )
 )
 
-(defun content-get-user-id (json-data)
+(defun content-get-user-id (json)
  (if *session*
   (session-value 'id *session*)
-  (let ((email (cdr (assoc :email json-data))))
+  (let ((email (cdr (assoc :email json))))
    (if (null email)
        nil
        (with-connection *db-connection-parameters*
@@ -68,10 +68,9 @@
 ; GET /content/<uuid> returns the item with the given uuid. In this case
 ; uuid is a byte vector, already resolved by to-uuid, and converted. It
 ; is expected that the json post body here is null.
-(defun content-handle-get (uuid json-data)
- (assert (null json-data))
+(defun content-handle-get (uuid)
  (let ((item (item-load uuid))
-       (user-id (content-get-user-id json-data)))
+       (user-id (content-get-user-id nil)))
   (if (null user-id)
       (progn
             (setf (return-code*) +http-forbidden+)
@@ -103,13 +102,15 @@
 ; by the email posting system as cookies/session data is not available. This
 ; returns a JSON representation of the item structure which is fed back to the
 ; client.
-(defun content-handle-post (uuid json-data)
- (assert (not (null json-data)))
- (let* ((user-id (content-get-user-id json-data))
-        (content-ref (hex-string-to-byte-vector (cdr (assoc :data json-data))))
-        (item (item-create user-id uuid content-ref)))
-  (content-record-new-post user-id item)
-  (create-json-item item)
+(defun content-handle-post (uuid)
+ (with-posted-json (json)
+  (assert (not (null json)))
+  (let* ((user-id (content-get-user-id json))
+         (content-ref (hex-string-to-byte-vector (cdr (assoc :data json))))
+         (item (item-create user-id uuid content-ref)))
+   (content-record-new-post user-id item)
+   (create-json-item item)
+  )
  )
 )
 
@@ -117,30 +118,30 @@
 ; child : "<childuuid>" and de-links child from parent. The item isn't
 ; removed from the system as it may have been linked to other parent
 ; items.
-(defun content-handle-delete (parent-uuid json-data user-id)
- (let* ((child (cdr (assoc :child json-data)))
-        (child-uuid (to-uuid user-id child)))
-  (if (item-remove-from-list parent-uuid child-uuid)
-      *successful-post-response*
-      (setf (return-code*) +http-bad-request+))
+(defun content-handle-delete (parent-uuid user-id)
+ (with-posted-json (json)
+  (let* ((child (cdr (assoc :child json)))
+         (child-uuid (to-uuid user-id child)))
+   (if (item-remove-from-list parent-uuid child-uuid)
+       *successful-post-response*
+       (setf (return-code*) +http-bad-request+))
+  )
  )
 )
 
 (defun content-handler (uri)
- (with-posted-json (json-post-data)
-  (let* ((req (request-method* *request*))
-         (uuid-or-alias-string (cadr uri))
-         (user-id (session-value 'id *session*))
-         (uuid (if (not (null uuid-or-alias-string))
-                   (to-uuid user-id uuid-or-alias-string)
-                   *null-uuid*)))
-   (cond ((eq req :get) (content-handle-get uuid json-post-data))
-         ((eq req :post) (content-handle-post uuid json-post-data))
-         ((eq req :delete) (content-handle-delete uuid json-post-data user-id))
-         (t (progn 
-                  (setf (return-code*) +http-bad-request+)
-                  "Bad request!"))
-   )
+ (let* ((req (request-method* *request*))
+        (uuid-or-alias-string (cadr uri))
+        (user-id (session-value 'id *session*))
+        (uuid (if (not (null uuid-or-alias-string))
+                  (to-uuid user-id uuid-or-alias-string)
+                  *null-uuid*)))
+  (cond ((eq req :get) (content-handle-get uuid))
+        ((eq req :post) (content-handle-post uuid))
+        ((eq req :delete) (content-handle-delete uuid user-id))
+        (t (progn 
+                 (setf (return-code*) +http-bad-request+)
+                 "Bad request!"))
   )
  )
 )
