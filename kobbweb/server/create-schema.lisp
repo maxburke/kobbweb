@@ -20,7 +20,7 @@
   )
   (execute
    (:create-table aliases
-    ((user_id :type integer :primary-key t)
+    ((user_id :type integer)
      (item_id :type string)
      (alias :type string))
    )
