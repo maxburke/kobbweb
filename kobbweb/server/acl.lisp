@@ -142,19 +142,17 @@
 
 (defun acl-handle-post (item-id)
  (assert (not (null item-id)))
- (let* ((item (item-load item-id))
-        (raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8))
-        (json (if (or (null raw-json-string) (string= raw-json-string ""))
-                  nil
-                  (json:decode-json-from-string raw-json-string)))
-        (email (cdr (assoc :email json)))
-        (user-id (acl-resolve-user-id email item-id)))
+ (with-posted-json (json)
+  (let* ((item (item-load item-id))
+         (email (cdr (assoc :email json)))
+         (user-id (acl-resolve-user-id email item-id)))
 
   ;; TODO: The compiler thinks the call to acl-apply-add-to-item-and-children below is unreachable. Figure out why.
-  (when (not (acl-is-member-of (item-acl-ref item) user-id))
-        (acl-apply-add-to-item-and-children item user-id))
+   (when (not (acl-is-member-of (item-acl-ref item) user-id))
+         (acl-apply-add-to-item-and-children item user-id))
 
-  *successful-post-response*
+   *successful-post-response*
+  )
  )
 )
 

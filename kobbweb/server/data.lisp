@@ -15,10 +15,7 @@
 ; POST to /data will create a CAS-entry with the post body and return to the caller
 ; the 40-character stringized SHA1 hash of the content.
 (defun data-handle-post ()
- (let* ((raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8))
-        (json (if (or (null raw-json-string) (string= raw-json-string "")) 
-                  nil 
-                  (json:decode-json-from-string raw-json-string))))
+ (with-posted-json (json)
   (if (null json)
    (setf (return-code*) +http-bad-request+)
    (let ((data (cdr (assoc :data json))))

@@ -22,17 +22,8 @@
  )
 )
 
-(defun raw-login-data ()
- (let ((raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8)))
-  (if (and (not (null raw-json-string)) (not (string= raw-json-string "")))
-   raw-json-string
-   nil)
- )
-)
-
-(defun extract-login-data (raw-json-string)
- (let* ((json-string (json:decode-json-from-string raw-json-string))
-        (email (cdr (assoc :email json-string)))
+(defun extract-login-data (json-string)
+ (let* ((email (cdr (assoc :email json-string)))
         (password (cdr (assoc :password json-string)))
         (password-verify (cdr (assoc :password-verify json-string))))
   (values email password password-verify)
@@ -53,7 +44,7 @@
 
 (defmacro with-valid-login-data ((email password password-verify) &body body)
  (let ((var (gensym)))
-  `(let ((,var (raw-login-data)))
+  `(with-posted-json (,var)
     (if (null ,var)
      (progn (setf (return-code*) +http-bad-request+)
             (create-failure-response "It seems like you missed your email address or password!"))

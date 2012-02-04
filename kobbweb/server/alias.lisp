@@ -30,11 +30,10 @@
 ; or replaces an existing one with the alias provided.
 (defun alias-set (user-id uuid alias)
  (with-connection *db-connection-parameters*
-  (if (null (alias-resolve-alias user-id uuid))
-      (execute
-        (:insert-into 'aliases :set 'user_id user-id 'item_id uuid 'alias alias))
-      (execute
-        (:update 'aliases :set 'alias alias :where (:and (:= 'user_id user-id) (:= 'item_id uuid)))))
+  (with-transaction ()
+   (execute (:delete-from 'aliases :where (:and (:= 'user_id user-id) (:or (:= 'item_id uuid) (:= 'alias alias)))))
+   (execute (:insert-into 'aliases :set 'user_id user-id 'item_id uuid 'alias alias))
+  )
  )
 )
 
@@ -71,14 +70,12 @@
 ; creates a new alias if one does not yet exist or updates an existing one
 ; for the associated user and item.
 (defun alias-handle-post (uuid-or-alias-string)
- (let* ((user-id (session-value 'id *session*))
-        (raw-json-string (octets-to-string (raw-post-data :request *request*) :external-format :utf8))
-        (json (if (or (null raw-json-string) (string= raw-json-string ""))
-                  nil
-                  (json:decode-json-from-string raw-json-string)))
-        (alias (cdr (assoc :alias json))))
-  (alias-set user-id uuid-or-alias-string alias)
-  *successful-post-response*
+ (with-posted-json (json)
+  (let* ((user-id (session-value 'id *session*))
+         (alias (cdr (assoc :alias json))))
+   (alias-set user-id uuid-or-alias-string alias)
+   *successful-post-response*
+  )
  )
 )
 
