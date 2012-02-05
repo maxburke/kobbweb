@@ -52,6 +52,12 @@
      (:value :type :bytea))
    )
   )
+
+  (execute
+   (:create-table invite_requests
+    ((email :type string :primary-key t))
+   )
+  )
  )
 )
 

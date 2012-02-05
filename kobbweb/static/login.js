@@ -62,6 +62,24 @@ function joinDelegate() {
     });
 }
 
+function inviteDelegate() {
+    var email = $('#invitation').val();
+    if (email.indexOf('@') !== -1) {
+        var submitData = JSON.stringify({ email : email });
+        var ajaxRequest = {
+            url : '/beta',
+            type : 'POST',
+            dataType : 'json',
+            data : submitData,
+            processData : false,
+            success : function() {
+                $('#invite-box').html("<hr/><h3>Thank you for your interest!</h3><p>We'll be in touch!</p>");
+            }
+        };
+        $.ajax(ajaxRequest)
+    }
+}
+
 function init() {
     $('#submit').click(loginDelegate);
     $('#join').click(joinDelegate);
@@ -71,4 +89,5 @@ function init() {
     $('#join-form').keypress(function(e) { 
             submitOnEnter(e, joinDelegate); 
         });
+    $('#invite-submit').click(inviteDelegate);
 }

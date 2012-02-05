@@ -30,6 +30,7 @@
        (:file "email")
        (:file "acl")
        (:file "x")
+       (:file "beta")
       )
     )
   )

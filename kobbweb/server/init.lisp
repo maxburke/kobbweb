@@ -47,6 +47,7 @@
           (create-prefix-dispatcher "/posts" (uri-dispatcher #'posts-handler))
           (create-prefix-dispatcher "/email" #'email-handler)
           (create-prefix-dispatcher "/x" #'x-handler)
+          (create-prefix-dispatcher "/beta" #'beta-handler)
           (create-prefix-dispatcher "/" #'index-handler)
           ; TODO:
           ; Add special pages (ie, /500, /404) that have custom error messages for certain conditions.
