@@ -110,7 +110,7 @@
 ; GET /content/<uuid> returns the item with the given uuid. In this case
 ; uuid is a byte vector, already resolved by to-uuid, and converted. It
 ; is expected that the json post body here is null.
-(defun content-handle-get (uuid)
+(defun content-handle-get (uuid single-element-p)
  (let ((item (item-load uuid))
        (user-id (content-get-user-id nil)))
   (when (null user-id)
@@ -122,6 +122,8 @@
   (unless (acl-is-member-of (item-acl-ref item) user-id)
           (setf (return-code*) +http-forbidden+)
           (return-from content-handle-get "Forbidden"))
+  (when single-element-p
+        (return-from content-handle-get (create-json-item item)))
 
   (let* ((item-list-bytes (cas-load (item-list-ref item) +LIST-HIVE+))
          (item-assoc (create-item-assoc item item-list-bytes))
@@ -172,14 +174,14 @@
  )
 )
 
-(defun content-handler (uri)
+(defun content-handler-internal (uri single-element-p)
  (let* ((req (request-method* *request*))
         (uuid-or-alias-string (cadr uri))
         (user-id (session-value 'id *session*))
         (uuid (if (not (null uuid-or-alias-string))
                   (to-uuid user-id uuid-or-alias-string)
                   nil)))
-  (cond ((eq req :get) (content-handle-get uuid))
+  (cond ((eq req :get) (content-handle-get uuid single-element-p))
         ((eq req :post) (content-handle-post uuid))
         ((eq req :delete) (content-handle-delete uuid user-id))
         (t (progn 
@@ -188,4 +190,13 @@
   )
  )
 )
+
+(defun item-handler (uri)
+ (content-handler-internal uri t)
+)
+
+(defun content-handler (uri)
+ (content-handler-internal uri nil)
+)
+
 

@@ -32,6 +32,7 @@
  )
 )
 
+(declaim (inline kv-load))
 (defun kv-load (hive key)
  (with-connection *db-connection-parameters*
   (let ((rows (query (:select 'value :from hive :where (:= 'key key)))))
@@ -47,6 +48,7 @@
 (defun cas-load (content-ref hive)
  (kv-load hive content-ref)
 )
+
 
 ; Store the given content, provided as a byte vector, in the given hive. Returns
 ; the SHA1 digest of the content.

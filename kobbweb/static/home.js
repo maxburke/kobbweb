@@ -54,7 +54,7 @@ kw.Collections.ItemCollection = Backbone.Collection.extend({
     comparator : function(item) { 
         return item.get("idx");
     },
-    url : '/content'
+    url : '/item'
 });
 
 kw.Views.newItemView = Backbone.View.extend({
