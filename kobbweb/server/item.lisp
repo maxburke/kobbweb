@@ -234,9 +234,11 @@
 )
 
 ; Stringify the item list, for transmission to the web client.
-(defun item-get-list-as-strings (item)
+; Even though this appears to give the list in reverse order than it exists
+; in the database this will return the list in the order that the items
+; were added, as we push new list refs to the front of this list.
+(defun item-get-list-as-strings (list-bytes)
  (let ((children '())
-       (list-bytes (cas-load (item-list-ref item) +LIST-HIVE+))
        (item (make-array +uuid-size+ :element-type '(unsigned-byte 8))))
   (loop for i from 0 to (1- (length list-bytes)) by +uuid-size+
    do

@@ -1,7 +1,7 @@
 (in-package :kobbweb)
 
 ; Returns t if the char c is in the range [0..9] or [a..f]
-(declaim (inline is-hex-char) (optimize (debug 0) (speed 3) (safety 0)))
+(declaim (inline is-hex-char))
 (defun is-hex-char (c)
  (declare (type character c))
  (let ((code (char-code c)))
@@ -54,14 +54,56 @@
 )
 
 ; Create a JSON representation of the provided item structure.
-(defun create-json-item (item)
+(defun create-item-assoc (item list-bytes)
  (let ((json-assoc '()))
-  (push '(:success . "true") json-assoc)
   (push `(:parent . ,(byte-vector-to-hex-string (item-parent-uuid item))) json-assoc)
   (push `(:content-ref . ,(byte-vector-to-hex-string (item-content-ref item))) json-assoc)
-  (push `(:children . ,(item-get-list-as-strings item)) json-assoc)
+  (push `(:children . ,(item-get-list-as-strings list-bytes)) json-assoc)
   (push `(:id . ,(byte-vector-to-hex-string (item-uuid item))) json-assoc)
-  (json:encode-json-to-string json-assoc)
+  json-assoc
+ )
+)
+
+(defun create-json-item (item)
+ (let ((list-bytes (cas-load (item-list-ref item) +LIST-HIVE+)))
+  (json:encode-json-to-string (create-item-assoc item list-bytes))
+ )
+)
+
+; fetch-children-content-summaries fetches the content records for a given
+; item list (provided in byte vector form) but does not fetch the children
+; of these items, returning it in alist form for jsonification.
+(defun fetch-children-content-summaries (item-list-bytes)
+ (let* ((item-list '())
+        (temp-child (make-array +uuid-size+ :element-type '(unsigned-byte 8)))
+        (children-last-index (1- (length item-list-bytes))))
+  (loop for i from 0 to children-last-index by +uuid-size+
+   do
+   (memcpy temp-child item-list-bytes 0 i +uuid-size+)
+   (let* ((child-item (item-load temp-child))
+
+          ; For now we can get away with not resolving the children's list details
+          ; which will save us time when grabbing stuff from the CAS.
+;          (child-item-list (cas-load (item-list-ref child-item) +LIST-HIVE+))
+          (child-assoc-list (create-item-assoc child-item #()))
+          (child-uuid-string (cdr (assoc :id child-assoc-list))))
+    (push child-assoc-list item-list)
+   )
+  )
+  item-list
+ )
+)
+
+; Similar to the above function, this fetches a content record, sans children list,
+; and returns it in alist form.
+(defun fetch-single-item-content-summary (item-uuid)
+ (unless (uuid= item-uuid *null-uuid*)
+  (let* ((item-list '())
+         (parent-item (item-load item-uuid))
+         (parent-assoc (create-item-assoc parent-item #()))
+         (item-uuid (cdr (assoc :id parent-assoc))))
+   (cons parent-assoc nil)
+  )
  )
 )
 
@@ -71,21 +113,22 @@
 (defun content-handle-get (uuid)
  (let ((item (item-load uuid))
        (user-id (content-get-user-id nil)))
-  (if (null user-id)
-      (progn
-            (setf (return-code*) +http-forbidden+)
-            "Forbidden!")
-      (if (null item)
-          (progn
-                (setf (return-code*) +http-not-found+)
-                "Not found!")
-          (if (acl-is-member-of (item-acl-ref item) user-id)
-              (create-json-item item)
-              (progn
-                    (setf (return-code*) +http-forbidden+)
-                    "Forbidden!")
-          )
-      )
+  (when (null user-id)
+        (setf (return-code*) +http-forbidden+)
+        (return-from content-handle-get "Forbidden!"))
+  (when (null item)
+        (setf (return-code*) +http-not-found+)
+        (return-from content-handle-get "Not found!"))
+  (unless (acl-is-member-of (item-acl-ref item) user-id)
+          (setf (return-code*) +http-forbidden+)
+          (return-from content-handle-get "Forbidden"))
+
+  (let* ((item-list-bytes (cas-load (item-list-ref item) +LIST-HIVE+))
+         (item-assoc (create-item-assoc item item-list-bytes))
+         (item-uuid-string (cdr (assoc :id item-assoc))))
+   (json:encode-json-to-string (nconc (fetch-children-content-summaries item-list-bytes) 
+                                      (fetch-single-item-content-summary (item-parent-uuid item))
+                                      (cons item-assoc nil)))
   )
  )
 )
@@ -135,7 +178,7 @@
         (user-id (session-value 'id *session*))
         (uuid (if (not (null uuid-or-alias-string))
                   (to-uuid user-id uuid-or-alias-string)
-                  *null-uuid*)))
+                  nil)))
   (cond ((eq req :get) (content-handle-get uuid))
         ((eq req :post) (content-handle-post uuid))
         ((eq req :delete) (content-handle-delete uuid user-id))

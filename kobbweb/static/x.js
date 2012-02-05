@@ -66,28 +66,6 @@ memoizeItem = function(item) {
     ItemCache[item.id] = item;
 }
 
-getItem = function(uuid, callback) {
-    if (typeof ItemCache[uuid] === 'undefined') {
-        var ajaxRequest = { 
-            url : '/content/' + uuid,
-            type : 'GET',
-            dataType : 'json',
-            processData : false,
-            success : function(data, textStatus, jqXHR) {
-                getData(data.contentRef, function(dataResult, textStatus, jqXHR) {
-                    data.id = uuid;
-                    data.content = dataResult;
-                    ItemCache[uuid] = data;
-                    callback(data);
-                });
-            }
-        };
-        $.ajax(ajaxRequest);
-    } else {
-        callback(ItemCache[uuid]);
-    }
-}
-
 kw.Models.Item = Backbone.Model.extend({
     clear : function() {
         this.destroy();
@@ -202,27 +180,25 @@ kw.Views.itemDetailView = Backbone.View.extend({
             var childrenElement = $('#children');
 
             for (var i = 0; i < children.length; ++i) {
-                getItem(children[i], function(childModel) {
-                    var model = new kw.Models.Item(childModel);
-                    var childView = new itemSummaryView({ model : model });
-                    childrenElement.append(childView.render({ deletable : true }).el);
-                });
+                var childModel = ItemCache[children[i]];
+                var model = new kw.Models.Item(childModel);
+                var childView = new itemSummaryView({ model : model });
+                childrenElement.append(childView.render({ deletable : true }).el);
             }
         }
     },
     renderParent : function() {
         var element = this.el;
         $(element).append('<div id="parent"><hr/><ul></ul></div>');
-        getItem(this.model.get("parent"), function(parentModel) {
-            if (parentModel.content.length > 0) {
-                var parentElement = $('#parent > ul');
-                var model = new kw.Models.Item(parentModel);
-                var parentView = new itemSummaryView({ model : model });
-                parentElement.append(parentView.render().el);
-            } else {
-                $('#parent').remove();
-            }
-        });
+        var parentModel = ItemCache[this.model.get("parent")];
+        if (parentModel.content.length > 0) {
+            var parentElement = $('#parent > ul');
+            var model = new kw.Models.Item(parentModel);
+            var parentView = new itemSummaryView({ model : model });
+            parentElement.append(parentView.render().el);
+        } else {
+            $('#parent').remove();
+        }
     },
     renderAclModal : function() {
         var html = '<div id="acl" class="modal hide fade" style="display: none">';
@@ -331,10 +307,24 @@ kw.init = function() {
     if (itemUuid == NULL_ID)
         alert("Something went wrong!");
 
-    getItem(itemUuid, function(data) {
-        var model = new kw.Models.Item(data);
-        kw.App = new kw.Views.itemDetailView(model);
-        kw.App.render();
+    getJson('/content/' + itemUuid, function(items) {
+        var itemsLength = items.length;
+        var dataRefsFetched = 0;
+
+        for (var i = 0; i < itemsLength; ++i) {
+            var callback = (function(index) { return function(dataResult) {
+                ++dataRefsFetched;
+                items[index].content = dataResult;
+                ItemCache[items[index].id] = items[index];
+
+                if (dataRefsFetched === itemsLength) {
+                    var model = new kw.Models.Item(ItemCache[itemUuid]);
+                    kw.App = new kw.Views.itemDetailView(model);
+                    kw.App.render();
+                }
+            }})(i);
+            getData(items[i].contentRef, callback);
+        }
     });
 }
 

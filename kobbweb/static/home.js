@@ -41,29 +41,6 @@ memoizeItem = function(item) {
     ItemCache[item.id] = item;
 }
 
-getItem = function(uuid, successCallback, errorCallback) {
-    if (typeof ItemCache[uuid] === 'undefined') {
-        var ajaxRequest = { 
-            url : '/content/' + uuid,
-            type : 'GET',
-            dataType : 'json',
-            processData : false,
-            success : function(data, textStatus, jqXHR) {
-                getData(data.contentRef, function(dataResult, textStatus, jqXHR) {
-                    data.id = uuid;
-                    data.content = dataResult;
-                    ItemCache[uuid] = data;
-                    successCallback(data);
-                });
-            },
-            error : errorCallback
-        };
-        $.ajax(ajaxRequest);
-    } else {
-        callback(ItemCache[uuid]);
-    }
-}
-
 kw.Models.Item = Backbone.Model.extend({
     clear : function() {
         this.destroy();
@@ -194,42 +171,36 @@ kw.Views.AppView = Backbone.View.extend({
             parentElement.append(child);
         }
     },
-    modelLoadedCallback : function() {
-        if (++this.numModelsLoaded === this.expectedNumModels) {
-            this.render();
-        }
-    },
-    fetchEntry : function(itemList, i) {
-        var collection = this.items;
-        var view = this;
-        getItem(itemList[i], 
-            function(data) {
-                data.idx = i;
-                collection.add(data);
-                view.modelLoadedCallback();
-            },
-            function() {
-                // TODO: This needs to check the error code returned by
-                // the server. 403 is fine to ignore, others not so much
-                // (ie: 400, 500)
-                view.modelLoadedCallback();
-            });
-    },
     addEntry : function(model) {
         alert("add an entry here. you might need to change the collection comparator here to sort in reverse order. "
             + "THEN change the idx's assigned to the entries to be (numItems - i) instead of i so that new entries "
             + "are added to the right part of the array and, when sorted end up appearing at the top of the list.");
     },
     addEntries : function(itemList) {
-        if (itemList === null) {
+        if (itemList === null || itemList.length === 0) {
             this.render();
             return;
         }
 
-        this.expectedNumModels = itemList.length;
-        this.numModelsLoaded = 0;
-        for (var i = 0; i < itemList.length; ++i) {
-            this.fetchEntry(itemList, i);
+        var itemsLength = itemList.length;
+        var dataRefsFetched = 0;
+        var collection = this.items;
+        var renderFn = this.render;
+
+        for (var i = 0; i < itemsLength; ++i) {
+            var callback = (function(index) { return function(dataResult) {
+                ++dataRefsFetched;
+                var item = itemList[index];
+                item.content = dataResult;
+                item.idx = index;
+                ItemCache[item.id] = item;
+                collection.add(item);
+
+                if (dataRefsFetched === itemsLength) {
+                    renderFn();
+                }
+            }})(i);
+            getData(itemList[i].contentRef, callback);
         }
     },
     addNewChild : function(modelData) {

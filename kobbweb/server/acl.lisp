@@ -1,7 +1,5 @@
 (in-package :kobbweb)
 
-(declaim (optimize (debug 3) (speed 0) (safety 3)))
-
 ; Typically items are created with a default ACL containing only the 
 ; posting user's ID number. This function creates that ACL.
 (defun acl-create-default (user-id)

@@ -7,9 +7,10 @@
 (defun posts-fetch (user-id)
  (with-connection *db-connection-parameters*
   (let* ((posts (select-most-recent user-id 10 0))
-         (simplified-list (mapcar #'car posts))
-         (json (json:encode-json-to-string simplified-list)))
-   json
+         (simplified-list (mapcar (lambda (post) 
+                                   (car (fetch-single-item-content-summary (hex-string-to-byte-vector (car post)))))
+                           posts)))
+   (json:encode-json-to-string simplified-list)
   )
  )
 )
