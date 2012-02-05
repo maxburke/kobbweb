@@ -26,6 +26,8 @@
 )
     
 (defun init ()
+ (create-schema)
+
  (if (not (null *server-instance*))
   (stop *server-instance*))
 

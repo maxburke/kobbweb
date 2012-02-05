@@ -4,58 +4,76 @@
 
 (defun create-schema ()
  (with-connection *db-connection-parameters*
-  (execute
-   (:create-table users
-    ((user_id :type serial :primary-key t)
-     (email :type text)
-     (password :type text))
-   )
-  )
-  (execute
-   (:create-table posts
-    ((post_id :type serial :primary-key t)
-     (user_id :type integer)
-     (item_id :type string))
-   )
-  )
-  (execute
-   (:create-table aliases
-    ((user_id :type integer)
-     (item_id :type string)
-     (alias :type string))
+  (unless (table-exists-p 'users)
+   (execute
+    (:create-table users
+     ((user_id :type serial :primary-key t)
+      (email :type text)
+      (password :type text))
+    )
    )
   )
 
-  ;;;;;
-  ;;; Temporarily using Postgres as our key/value store, for easy hackability.
-  (execute
-   (:create-table lists
-    ((key :type :bytea :primary-key t)
-     (:value :type :bytea))
-   )
-  )
-  (execute
-   (:create-table acl
-    ((key :type :bytea :primary-key t)
-     (:value :type :bytea))
-   )
-  )
-  (execute
-   (:create-table data
-    ((key :type :bytea :primary-key t)
-     (:value :type :bytea))
-   )
-  )
-  (execute
-   (:create-table items
-    ((key :type :bytea :primary-key t)
-     (:value :type :bytea))
+  (unless (table-exists-p 'posts)
+   (execute
+    (:create-table posts
+     ((post_id :type serial :primary-key t)
+      (user_id :type integer)
+      (item_id :type string))
+    )
    )
   )
 
-  (execute
-   (:create-table invite_requests
-    ((email :type string :primary-key t))
+  (unless (table-exists-p 'aliases)
+   (execute
+    (:create-table aliases
+     ((user_id :type integer)
+      (item_id :type string)
+      (alias :type string))
+    )
+   )
+  )
+ 
+   ;;;;;
+   ;;; Temporarily using Postgres as our key/value store, for easy hackability.
+  (unless (table-exists-p 'lists)
+   (execute
+    (:create-table lists
+     ((key :type :bytea :primary-key t)
+      (:value :type :bytea))
+    )
+   )
+  )
+  (unless (table-exists-p 'acl)
+   (execute
+    (:create-table acl
+     ((key :type :bytea :primary-key t)
+      (:value :type :bytea))
+    )
+   )
+  )
+  (unless (table-exists-p 'data)
+   (execute
+    (:create-table data
+     ((key :type :bytea :primary-key t)
+      (:value :type :bytea))
+    )
+   )
+  )
+  (unless (table-exists-p 'items)
+   (execute
+    (:create-table items
+     ((key :type :bytea :primary-key t)
+      (:value :type :bytea))
+    )
+   )
+  )
+
+  (unless (table-exists-p 'invite_requests)
+   (execute
+    (:create-table invite_requests
+     ((email :type string :primary-key t))
+    )
    )
   )
  )
